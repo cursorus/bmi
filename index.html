@@ -142,135 +142,166 @@
 
     <script>
         // Регистрация Service Worker для оффлайн работы
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(err => console.log('SW failed', err));
-            });
-        }
+        // Регистрация Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW failed', err));
+    });
+}
 
-        const logContainer = document.getElementById('log-container');
-        const urlInput = document.getElementById('url-input');
-        const btnMain = document.getElementById('btn-main');
-        
-        let isRunning = false;
-        let controller = null;
-        let pixelTimer = null;
+const logContainer = document.getElementById('log-container');
+const urlInput = document.getElementById('url-input');
+const btnMain = document.getElementById('btn-main');
 
-        function addLog(text, color = 'var(--console-green)') {
-            const line = document.createElement('div');
-            line.className = 'log-line';
-            line.style.color = color;
-            line.innerText = `> ${text}`;
-            logContainer.appendChild(line);
-            logContainer.scrollTop = logContainer.scrollHeight;
-        }
+let isRunning = false;
+let controller = null;
+let pixelTimer = null;
 
-        function handleAction() {
-            if (isRunning) stopAll("USER_ABORTED");
-            else startSequence();
-        }
+// Список доступных CORS прокси
+const PROXY_LIST = [
+    { name: "ALPHA", url: "https://api.allorigins.win/get?url=" },
+    { name: "BETA",  url: "https://corsproxy.io/?" },
+    { name: "GAMMA", url: "https://thingproxy.freeboard.io/fetch/" },
+    { name: "DELTA", url: "https://api.codetabs.com/v1/proxy/?quest=" },
+    { name: "EPSILON", url: "https://cors-anywhere.herokuapp.com/" }, // Требует активации, может упасть
+    { name: "ZETA",   url: "https://proxy.cors.sh/" },
+    { name: "OMEGA",  url: "https://wt-753982425578-0.sandbox.auth0-extend.com/proxy?url=" }
+];
 
-        function stopAll(reason = null) {
-            isRunning = false;
-            if (controller) controller.abort();
-            clearInterval(pixelTimer);
-            btnMain.innerText = "EXECUTE SCAN";
-            btnMain.classList.remove('abort');
-            if (reason) addLog(reason, 'var(--error)');
-        }
+function addLog(text, color = 'var(--console-green)') {
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.style.color = color;
+    line.innerText = `> ${text}`;
+    logContainer.appendChild(line);
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
 
-        async function startSequence() {
-            let target = urlInput.value.trim();
-            if (!target) return;
+function handleAction() {
+    if (isRunning) stopAll("USER_ABORTED");
+    else startSequence();
+}
 
-            // Проверка наличия интернета перед стартом
-            if (!navigator.onLine) {
-                addLog("CRITICAL: NO_LOCAL_INTERNET", "var(--error)");
-                finish(false, 0);
-                return;
-            }
+function stopAll(reason = null) {
+    isRunning = false;
+    if (controller) controller.abort();
+    clearInterval(pixelTimer);
+    btnMain.innerText = "EXECUTE SCAN";
+    btnMain.classList.remove('abort');
+    if (reason) addLog(reason, reason === "USER_ABORTED" ? 'var(--error)' : 'var(--primary)');
+}
 
-            if (!target.startsWith('http')) target = 'https://' + target;
+async function startSequence() {
+    let target = urlInput.value.trim();
+    if (!target) return;
 
-            stopAll(); 
-            isRunning = true;
-            btnMain.innerText = "ABORT_SEQUENCE";
-            btnMain.classList.add('abort');
-            logContainer.innerHTML = '';
-            document.getElementById('result-area').style.display = 'none';
+    if (!navigator.onLine) {
+        addLog("CRITICAL: NO_LOCAL_INTERNET", "var(--error)");
+        finish(false, 0);
+        return;
+    }
 
-            pixelTimer = setInterval(() => {
-                const p = document.createElement('div');
-                p.className = 'btn-pixel';
-                p.style.width = (Math.random() * 30 + 10) + 'px';
-                p.style.left = Math.random() * (btnMain.offsetWidth - 20) + 'px';
-                p.style.top = Math.random() * (btnMain.offsetHeight - 3) + 'px';
-                btnMain.appendChild(p);
-                setTimeout(() => p.remove(), 150);
-            }, 60);
+    if (!target.startsWith('http')) target = 'https://' + target;
 
-            addLog("RACING PROXIES...");
-            controller = new AbortController();
-            const startTime = Date.now();
-            
-            const proxies = [
-                `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`,
-                `https://corsproxy.io/?${encodeURIComponent(target)}`
-            ];
+    stopAll(); 
+    isRunning = true;
+    btnMain.innerText = "ABORT_SEQUENCE";
+    btnMain.classList.add('abort');
+    logContainer.innerHTML = '';
+    document.getElementById('result-area').style.display = 'none';
 
-            const fetchFromProxy = async (url, name) => {
-                const res = await fetch(url, { signal: controller.signal });
-                if (!res.ok) throw new Error();
-                addLog(`${name} RESPONDED`);
-                return Date.now() - startTime;
-            };
+    // Эффект пикселей на кнопке
+    pixelTimer = setInterval(() => {
+        const p = document.createElement('div');
+        p.className = 'btn-pixel';
+        p.style.width = (Math.random() * 30 + 10) + 'px';
+        p.style.left = Math.random() * (btnMain.offsetWidth - 20) + 'px';
+        p.style.top = Math.random() * (btnMain.offsetHeight - 3) + 'px';
+        btnMain.appendChild(p);
+        setTimeout(() => p.remove(), 150);
+    }, 60);
 
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("TIMEOUT")), 3000)
-            );
+    addLog("INITIALIZING MULTI-PATH SCAN...");
+    controller = new AbortController();
+    const startTime = Date.now();
+
+    // Создаем массив запросов
+    const fetchPromises = PROXY_LIST.map(proxy => {
+        return new Promise(async (resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                addLog(`NODE_${proxy.name}: TIMEOUT`, "orange");
+                reject("TIMEOUT");
+            }, 5000); // 5 секунд на каждый прокси
 
             try {
-                const fastestLatency = await Promise.race([
-                    fetchFromProxy(proxies[0], "NODE_ALPHA"),
-                    fetchFromProxy(proxies[1], "NODE_GAMMA"),
-                    timeoutPromise
-                ]);
-                if (isRunning) finish(true, fastestLatency);
+                const res = await fetch(proxy.url + encodeURIComponent(target), { 
+                    signal: controller.signal,
+                    mode: 'cors' 
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (res.ok) {
+                    const lat = Date.now() - startTime;
+                    addLog(`NODE_${proxy.name}: OK (${lat}ms)`, "var(--primary)");
+                    resolve(lat);
+                } else {
+                    addLog(`NODE_${proxy.name}: REJECTED (${res.status})`, "var(--error)");
+                    reject("REJECTED");
+                }
             } catch (e) {
-                if (isRunning) finish(false, 0);
+                clearTimeout(timeoutId);
+                if (e.name !== 'AbortError') {
+                    addLog(`NODE_${proxy.name}: OFFLINE`, "var(--error)");
+                }
+                reject("ERROR");
             }
-        }
+        });
+    });
 
-        function finish(isOk, latency) {
-            stopAll();
-            const area = document.getElementById('result-area');
-            area.style.display = 'block';
-            document.getElementById('icon-success').style.display = isOk ? 'block' : 'none';
-            document.getElementById('icon-fail').style.display = isOk ? 'none' : 'block';
-            
-            const txt = document.getElementById('status-text');
-            txt.innerText = isOk ? `ONLINE (${latency}ms)` : "OFFLINE / DENIED";
-            txt.style.color = isOk ? "var(--primary)" : "var(--error)";
-            
-            if (!isOk) addLog("SIGNAL_LOST", "var(--error)");
-            gsap.from(area, { y: 10, opacity: 0, duration: 0.3 });
+    try {
+        // Ждем хотя бы один успешный ответ
+        const fastestLatency = await Promise.any(fetchPromises);
+        if (isRunning) finish(true, fastestLatency);
+    } catch (e) {
+        // Если ВСЕ прокси выдали ошибку
+        if (isRunning) {
+            addLog("ALL_NODES_FAILED", "var(--error)");
+            finish(false, 0);
         }
+    }
+}
 
-        const canvas = document.getElementById('pixel-canvas');
-        const ctx = canvas.getContext('2d');
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.onresize = resize; resize();
+function finish(isOk, latency) {
+    const area = document.getElementById('result-area');
+    area.style.display = 'block';
+    document.getElementById('icon-success').style.display = isOk ? 'block' : 'none';
+    document.getElementById('icon-fail').style.display = isOk ? 'none' : 'block';
+    
+    const txt = document.getElementById('status-text');
+    txt.innerText = isOk ? `ONLINE (${latency}ms)` : "TARGET_UNREACHABLE";
+    txt.style.color = isOk ? "var(--primary)" : "var(--error)";
+    
+    stopAll(isOk ? "SCAN_COMPLETE" : "SIGNAL_LOST");
+    gsap.from(area, { y: 10, opacity: 0, duration: 0.3 });
+}
 
-        function draw() {
-            ctx.fillStyle = "rgba(0,0,0,0.15)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#00FF00"; // Крупные пиксели теперь яркие
-            for(let i = 0; i < 8; i++) {
-                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 4, 4);
-            }
-            requestAnimationFrame(draw);
-        }
-        draw();
+// Рендер фона (без изменений)
+const canvas = document.getElementById('pixel-canvas');
+const ctx = canvas.getContext('2d');
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.onresize = resize; resize();
+function draw() {
+    ctx.fillStyle = "rgba(0,0,0,0.15)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#00FF00";
+    for(let i = 0; i < 8; i++) {
+        ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 4, 4);
+    }
+    requestAnimationFrame(draw);
+}
+draw();
+
     </script>
 </body>
 </html>
