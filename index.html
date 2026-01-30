@@ -3,7 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Blame My Internet // Terminal</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BlameNet">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.jpg">
+
+    <title>Blame My Internet</title>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -13,8 +20,9 @@
             --bg: #050505;
             --primary: #00ff41;
             --error: #ff3131;
-            --dim: #1a3a1a;
         }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             margin: 0; padding: 0;
@@ -27,7 +35,7 @@
         }
 
         #pixel-canvas {
-            position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.3;
+            position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.4;
         }
 
         .main-card {
@@ -35,59 +43,58 @@
             z-index: 10;
             width: 90%;
             max-width: 420px;
-            background: rgba(5, 5, 5, 0.95);
+            background: rgba(10, 10, 10, 0.98);
             border: 1px solid var(--primary);
             padding: 25px;
-            border-radius: 2px;
+            border-radius: 4px;
             text-align: center;
-            box-shadow: 0 0 20px rgba(0, 255, 65, 0.05);
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.1);
         }
 
-        h1 { font-size: 0.8rem; letter-spacing: 4px; margin-bottom: 20px; color: var(--primary); opacity: 0.8; }
+        h1 { font-size: 0.9rem; letter-spacing: 3px; margin-bottom: 20px; color: var(--primary); }
 
-        .input-group { position: relative; margin-bottom: 10px; }
+        .input-group { position: relative; margin-bottom: 15px; }
 
         input {
-            width: 100%; background: #000; border: 1px solid var(--dim);
+            width: 100%; background: #000; border: 1px solid #1a3a1a;
             padding: 12px 45px 12px 12px; border-radius: 0;
             color: var(--primary); font-size: 14px; outline: none;
-            font-family: inherit;
+            font-family: inherit; transition: border 0.3s;
         }
         input:focus { border-color: var(--primary); }
 
         .paste-btn {
             position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-            background: none; border: none; color: var(--primary); cursor: pointer; opacity: 0.5;
+            background: none; border: none; color: var(--primary); cursor: pointer; opacity: 0.7;
         }
 
         .check-btn {
             width: 100%; padding: 15px; background: var(--primary);
             color: black; border: none; font-weight: 900;
             cursor: pointer; letter-spacing: 1px; position: relative;
-            text-transform: uppercase; transition: all 0.2s;
+            overflow: hidden; text-transform: uppercase;
         }
-        .check-btn:active { transform: scale(0.98); }
+        
         .check-btn.abort { background: var(--error); color: white; }
 
-        /* ТЕРМИНАЛ ВСЕГДА ОТКРЫТ */
         #log-container {
-            height: 160px; overflow-y: auto;
-            background: rgba(0,0,0,0.5); margin-top: 15px;
-            text-align: left; border: 1px solid var(--dim);
-            padding: 10px; scroll-behavior: smooth;
+            height: 180px; overflow-y: auto;
+            background: #000; margin-top: 15px;
+            text-align: left; border: 1px solid #1a3a1a;
+            padding: 10px;
         }
 
         .log-line {
             font-size: 10px; color: var(--primary); margin-bottom: 4px;
-            opacity: 0.8; font-family: 'Fira Code', monospace;
+            opacity: 0.8; white-space: pre-wrap;
         }
 
-        #result-area { margin-top: 15px; min-height: 60px; }
-        .status-icon { font-size: 28px; margin-bottom: 5px; }
+        #result-area { margin-top: 20px; display: none; }
+        .status-icon { font-size: 36px; margin-bottom: 10px; }
         
-        /* Скроллбар */
-        #log-container::-webkit-scrollbar { width: 4px; }
-        #log-container::-webkit-scrollbar-thumb { background: var(--dim); }
+        /* Скроллбар терминала */
+        #log-container::-webkit-scrollbar { width: 3px; }
+        #log-container::-webkit-scrollbar-thumb { background: var(--primary); }
     </style>
 </head>
 <body>
@@ -95,10 +102,10 @@
     <canvas id="pixel-canvas"></canvas>
 
     <div class="main-card">
-        <h1>// NETWORK_PROBE_V1</h1>
+        <h1>BLAME MY INTERNET</h1>
         
         <div class="input-group">
-            <input type="text" id="url-input" placeholder="HOST_IP_OR_URL" autocomplete="off">
+            <input type="text" id="url-input" placeholder="HOST_ADDRESS" spellcheck="false">
             <button class="paste-btn" onclick="pasteFromClipboard()">
                 <i class="fa-solid fa-paste"></i>
             </button>
@@ -109,14 +116,13 @@
         </button>
 
         <div id="log-container">
-            <div class="log-line">> SYSTEM READY...</div>
-            <div class="log-line">> WAITING FOR TARGET_HOST</div>
+            <div class="log-line">> SYSTEM_IDLE... READY</div>
         </div>
-
+        
         <div id="result-area">
-            <div id="icon-success" class="status-icon" style="color:var(--primary); display:none"><i class="fa-solid fa-shield-halved"></i></div>
-            <div id="icon-fail" class="status-icon" style="color:var(--error); display:none"><i class="fa-solid fa-triangle-exclamation"></i></div>
-            <div id="status-text" style="font-size: 11px; font-weight: bold; letter-spacing: 1px;"></div>
+            <div id="icon-success" class="status-icon" style="color:var(--primary)"><i class="fa-solid fa-shield-halved"></i></div>
+            <div id="icon-fail" class="status-icon" style="color:var(--error)"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div id="status-text" style="font-size: 12px; font-weight: bold;"></div>
         </div>
     </div>
 
@@ -138,39 +144,27 @@
 
         async function handleAction() {
             if (isRunning) {
-                abortSequence();
+                if (controller) controller.abort();
+                stopSequence("TERMINATED_BY_OPERATOR");
                 return;
             }
             startSequence();
         }
 
-        function abortSequence() {
-            if (controller) controller.abort();
-            isRunning = false;
-            btnMain.innerText = "EXECUTE SCAN";
-            btnMain.classList.remove('abort');
-            addLog("SEQUENCE_ABORTED_BY_USER", 'var(--error)');
-        }
-
         async function startSequence() {
             let target = urlInput.value.trim();
-            if(!target) {
-                addLog("ERR: NO_TARGET_SPECIFIED", 'var(--error)');
-                return;
-            }
+            if(!target) return;
             
             isRunning = true;
             btnMain.innerText = "ABORT_SEQUENCE";
             btnMain.classList.add('abort');
             
             logContainer.innerHTML = '';
-            document.getElementById('icon-success').style.display = 'none';
-            document.getElementById('icon-fail').style.display = 'none';
-            document.getElementById('status-text').innerText = '';
+            document.getElementById('result-area').style.display = 'none';
 
-            addLog("INITIALIZING PROBE...");
-            await sleep(500);
-            addLog(`TARGET: ${target}`);
+            addLog("INITIALIZING CONNECT...");
+            await sleep(400);
+            addLog(`RESOLVING DNS: ${target}`);
             
             controller = new AbortController();
             checkAvailability(target);
@@ -180,81 +174,84 @@
             let cleanUrl = target.startsWith('http') ? target : 'https://' + target;
             const startTime = Date.now();
             
-            // Фейковые шаги для "хакерского" вида
-            const fakeSteps = [
-                "BYPASSING CLOUDFLARE_EDGE...",
-                "TUNNELING THROUGH PROXY_NODE...",
-                "ATTEMPTING HANDSHAKE (TCP)...",
-                "STRETCHING PACKET DATA...",
-                "RETRYING VIA ALTERNATE PORT...",
-                "ANALYZING HOP_COUNT..."
-            ];
-
-            let stepIdx = 0;
-            const stepInterval = setInterval(() => {
-                if (isRunning && stepIdx < fakeSteps.length) {
-                    addLog(fakeSteps[stepIdx], 'rgba(0, 255, 65, 0.5)');
-                    stepIdx++;
-                }
-            }, 800);
+            // Имитация "попыток" в консоли, если запрос долгий
+            let attempts = 0;
+            const fakeAttempts = setInterval(() => {
+                if (!isRunning) return clearInterval(fakeAttempts);
+                attempts++;
+                const logs = [
+                    "RETRYING PACKET_SEND...",
+                    "BYPASSING TIMEOUT...",
+                    "CHANGING NODE...",
+                    "RE-ROUTING TRAFFIC..."
+                ];
+                addLog(logs[Math.floor(Math.random() * logs.length)], 'rgba(0, 255, 65, 0.4)');
+            }, 1200);
 
             try {
                 const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(cleanUrl)}`;
-                const response = await fetch(proxyUrl, { signal: controller.signal });
-                const data = await response.json();
+                const res = await fetch(proxyUrl, { signal: controller.signal });
+                const data = await res.json();
                 
-                clearInterval(stepInterval);
+                clearInterval(fakeAttempts);
                 const latency = Date.now() - startTime;
 
                 if (data.status && data.status.http_code) {
-                    addLog(`RECV STATUS: ${data.status.http_code}`, 'var(--primary)');
+                    addLog(`RECV STATUS: ${data.status.http_code}`);
+                    addLog(`LATENCY: ${latency}ms`);
                     finish(true, latency);
                 } else { throw new Error(); }
             } catch (err) {
-                if (err.name === 'AbortError') return;
-                clearInterval(stepInterval);
-                addLog("ERR: CONNECTION_REFUSED", 'var(--error)');
-                finish(false);
+                clearInterval(fakeAttempts);
+                if (err.name !== 'AbortError') {
+                    addLog("ERR: HOST_UNREACHABLE", 'var(--error)');
+                    finish(false);
+                }
             }
         }
 
-        function finish(isOk, latency) {
+        function stopSequence(reason) {
             isRunning = false;
             btnMain.innerText = "EXECUTE SCAN";
             btnMain.classList.remove('abort');
+            if (reason) addLog(reason, 'var(--error)');
+        }
 
+        function finish(isOk, latency) {
+            stopSequence();
             const statusText = document.getElementById('status-text');
-            const icon = isOk ? document.getElementById('icon-success') : document.getElementById('icon-fail');
+            const iconSuccess = document.getElementById('icon-success');
+            const iconFail = document.getElementById('icon-fail');
             
-            icon.style.display = 'block';
-            statusText.innerText = isOk ? `ONLINE // LATENCY: ${latency}ms` : "OFFLINE // UNREACHABLE";
+            document.getElementById('result-area').style.display = 'block';
+            iconSuccess.style.display = isOk ? 'block' : 'none';
+            iconFail.style.display = isOk ? 'none' : 'block';
+            
+            statusText.innerText = isOk ? `AVAILABLE (${latency}ms)` : "NOT AVAILABLE";
             statusText.style.color = isOk ? "var(--primary)" : "var(--error)";
 
-            gsap.from(icon, {scale: 0.5, opacity: 0, duration: 0.4, ease: "back.out"});
+            gsap.from("#result-area", {y: 10, opacity: 0, duration: 0.3});
         }
 
         async function pasteFromClipboard() {
-            try {
-                const text = await navigator.clipboard.readText();
-                urlInput.value = text;
-                addLog("DATA_IMPORTED_FROM_CLIPBOARD");
-            } catch (e) {}
+            const text = await navigator.clipboard.readText();
+            urlInput.value = text;
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-        // Background Animation
+        // Background
         const canvas = document.getElementById('pixel-canvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize; resize();
 
         function draw() {
-            ctx.fillStyle = "rgba(5, 5, 5, 0.2)";
+            ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#00ff41";
-            for(let i=0; i<15; i++) {
-                ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 1, 1);
+            for(let i=0; i<20; i++) {
+                ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
             }
             requestAnimationFrame(draw);
         }
