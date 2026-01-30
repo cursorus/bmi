@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cyber Scan v2.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    
+    <style>
+        :root {
+            --bg: #050505;
+            --primary: #00ff41;
+            --error: #ff3131;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0; padding: 0;
+            background: var(--bg);
+            color: white;
+            font-family: 'Fira Code', monospace;
+            height: 100dvh;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+
+        #pixel-canvas {
+            position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.5;
+        }
+
+        /* ТЕРМИНАЛ ЛОГОВ */
+        #terminal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 100;
+            padding: 20px;
+            display: none;
+            flex-direction: column;
+            justify-content: flex-end;
+            pointer-events: none;
+        }
+
+        .log-line {
+            font-size: 12px;
+            line-height: 1.4;
+            color: var(--primary);
+            text-shadow: 0 0 5px var(--primary);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        /* ОСНОВНАЯ КАРТОЧКА */
+        .main-card {
+            position: relative;
+            z-index: 10;
+            width: 90%;
+            max-width: 400px;
+            background: rgba(15, 15, 15, 0.95);
+            border: 1px solid var(--primary);
+            padding: 30px 20px;
+            border-radius: 4px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+        }
+
+        h1 { font-size: 1rem; letter-spacing: 3px; margin-bottom: 25px; color: var(--primary); }
+
+        .input-group { position: relative; margin-bottom: 15px; }
+
+        input {
+            width: 100%; background: #000; border: 1px solid #00ff41;
+            padding: 12px 45px 12px 12px; border-radius: 0;
+            color: var(--primary); font-size: 14px; outline: none;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .paste-btn {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: var(--primary); cursor: pointer;
+        }
+
+        .check-btn {
+            width: 100%; padding: 15px; background: var(--primary);
+            color: black; border: none; font-weight: 900;
+            cursor: pointer; letter-spacing: 1px;
+        }
+
+        #result-area {
+            margin-top: 25px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        .status-icon { font-size: 40px; margin-bottom: 10px; display: none; }
+        
+        /* Эффект глитча для закрытия */
+        .glitch-out {
+            animation: glitch-anim 0.3s infinite;
+            filter: hue-rotate(90deg);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        @keyframes glitch-anim {
+            0% { transform: translate(0); }
+            20% { transform: translate(-5px, 5px); }
+            40% { transform: translate(-5px, -5px); }
+            60% { transform: translate(5px, 5px); }
+            80% { transform: translate(5px, -5px); }
+            100% { transform: translate(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="pixel-canvas"></canvas>
+    
+    <div id="terminal"></div>
+
+    <div class="main-card" id="card">
+        <h1>SYS.SCAN_NETWORK</h1>
+        
+        <div class="input-group">
+            <input type="text" id="url-input" placeholder="HOST_ADDRESS">
+            <button class="paste-btn" onclick="pasteFromClipboard()">
+                <i class="fa-solid fa-paste"></i>
+            </button>
+        </div>
+
+        <button class="check-btn" id="btn-check" onclick="startSequence()">
+            EXECUTE SCAN
+        </button>
+
+        <div id="result-area">
+            <div id="icon-success" class="status-icon" style="color:var(--primary)"><i class="fa-solid fa-shield-halved"></i></div>
+            <div id="icon-fail" class="status-icon" style="color:var(--error)"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div id="status-text"></div>
+        </div>
+    </div>
+
+    <script>
+        const terminal = document.getElementById('terminal');
+        const urlInput = document.getElementById('url-input');
+        
+        // Рандомные строки для лога
+        const fakeLogs = [
+            "INITIALIZING TUNNEL...", "BYPASSING FIREWALL...", "INJECTING PACKETS...",
+            "ENCRYPTING MD5_HASH...", "ACCESSING NODE_0x442...", "TRACING IP ROUTE...",
+            "SSL_CERTIFICATE_VERIFIED", "BUFFER_OVERFLOW_PREVENTION: OFF",
+            "SPOOFING USER_AGENT...", "DB_QUERY: SELECT * FROM ACCESS",
+            "PROXY_STUN_SERVER: CONNECTED", "PINGING REMOTE_SERVER...",
+            "LATENCY_TEST: 44ms", "HANDSHAKE_PROTOCOL: SUCCESS"
+        ];
+
+        async function pasteFromClipboard() {
+            const text = await navigator.clipboard.readText();
+            urlInput.value = text;
+        }
+
+        function addLog(text) {
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.innerText = `> ${text}`;
+            terminal.appendChild(line);
+            
+            // Удаляем старые строки, если их много (чтобы не тормозило)
+            if (terminal.childNodes.length > 25) {
+                terminal.removeChild(terminal.firstChild);
+            }
+        }
+
+        async function startSequence() {
+            let target = urlInput.value.trim();
+            if(!target) return;
+            
+            // Подготовка UI
+            terminal.style.display = 'flex';
+            terminal.innerHTML = '';
+            document.getElementById('icon-success').style.display = 'none';
+            document.getElementById('icon-fail').style.display = 'none';
+            document.getElementById('status-text').innerText = 'SCANNING...';
+
+            // Имитация логов
+            for(let i = 0; i < 20; i++) {
+                const log = i === 5 ? `TARGET: ${target}` : fakeLogs[Math.floor(Math.random() * fakeLogs.length)];
+                addLog(log);
+                await new Promise(r => setTimeout(r, 70));
+            }
+
+            // Реальная проверка
+            checkAvailability(target);
+        }
+
+        async function checkAvailability(target) {
+            let cleanUrl = target.startsWith('http') ? target : 'https://' + target;
+            
+            try {
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(cleanUrl)}`;
+                const res = await fetch(proxyUrl);
+                const data = await res.json();
+                
+                finish(data.status.http_code >= 200 && data.status.http_code < 400);
+            } catch {
+                finish(false);
+            }
+        }
+
+        function finish(isOk) {
+            // Эффект глитча перед закрытием терминала
+            terminal.classList.add('glitch-out');
+            
+            setTimeout(() => {
+                terminal.style.display = 'none';
+                terminal.classList.remove('glitch-out');
+                
+                const statusText = document.getElementById('status-text');
+                const icon = isOk ? document.getElementById('icon-success') : document.getElementById('icon-fail');
+                
+                icon.style.display = 'block';
+                statusText.innerText = isOk ? "THIS SITE IS AVAILABLE" : "THIS SITE IS NOT AVAILABLE";
+                statusText.style.color = isOk ? "var(--primary)" : "var(--error)";
+
+                gsap.from(icon, {scale: 0.5, opacity: 0, duration: 0.5, ease: "elastic.out(1, 0.3)"});
+            }, 400);
+        }
+
+        // Фоновые пиксели (Canvas)
+        const canvas = document.getElementById('pixel-canvas');
+        const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize; resize();
+
+        function draw() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#00ff41";
+            for(let i=0; i<30; i++) {
+                ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+            }
+            requestAnimationFrame(draw);
+        }
+        draw();
+    </script>
+</body>
+</html>
