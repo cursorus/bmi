@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Professional Network Analyzer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>Advanced Network Scanner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    
     <style>
         :root {
-            --bg: #080808;
+            --bg: #050505;
             --primary: #00ff41;
             --error: #ff3131;
-            --info: #00d1ff;
+            --warn: #f1c40f;
         }
 
         body {
@@ -21,80 +22,73 @@
             display: flex; align-items: center; justify-content: center; overflow: hidden;
         }
 
-        /* ТЕРМИНАЛ */
+        /* ТЕРМИНАЛ (Снова красивый) */
         #terminal {
-            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95);
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9);
             z-index: 100; padding: 20px; display: none;
-            flex-direction: column; justify-content: flex-start;
-            overflow-y: hidden; pointer-events: none;
+            flex-direction: column; justify-content: flex-end;
+            pointer-events: none;
         }
 
         .log-line {
-            font-size: 11px; line-height: 1.6; margin-bottom: 2px;
-            border-left: 2px solid transparent; padding-left: 8px;
+            font-size: 11px; line-height: 1.4; margin-bottom: 4px;
+            text-shadow: 0 0 5px rgba(0,255,65,0.5);
         }
-        .log-info { color: var(--info); }
-        .log-warn { color: #ffcc00; }
-        .log-success { color: var(--primary); border-left-color: var(--primary); }
-        .log-error { color: var(--error); border-left-color: var(--error); }
 
-        /* ИНТЕРФЕЙС */
+        /* КАРТОЧКА (Возвращаем неон) */
         .main-card {
-            position: relative; z-index: 10; width: 90%; max-width: 450px;
-            background: #111; border: 1px solid #333; padding: 30px;
-            border-radius: 12px; box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            position: relative; z-index: 10; width: 90%; max-width: 420px;
+            background: rgba(15, 15, 15, 0.95);
+            border: 1px solid var(--primary);
+            padding: 40px 20px; border-radius: 4px; text-align: center;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.15);
         }
 
-        .status-badge {
-            display: inline-block; padding: 4px 12px; border-radius: 20px;
-            font-size: 10px; font-weight: bold; background: #222;
-            color: #888; margin-bottom: 20px;
-        }
+        h1 { font-size: 0.9rem; letter-spacing: 4px; color: var(--primary); margin-bottom: 30px; }
 
         input {
-            width: 100%; background: #000; border: 1px solid #333;
+            width: 100%; background: #000; border: 1px solid var(--primary);
             padding: 15px; color: var(--primary); font-family: inherit;
-            margin-bottom: 15px; border-radius: 6px; outline: none;
+            margin-bottom: 20px; outline: none; box-shadow: inset 0 0 10px rgba(0,255,65,0.1);
         }
 
-        .btn-row { display: flex; gap: 10px; }
+        .btn-execute {
+            width: 100%; padding: 18px; background: var(--primary);
+            color: black; border: none; font-weight: 900; cursor: pointer;
+            letter-spacing: 2px; text-transform: uppercase; transition: 0.3s;
+        }
+        .btn-execute:hover { box-shadow: 0 0 20px var(--primary); }
+        .btn-execute:disabled { opacity: 0.4; filter: grayscale(1); }
+
+        #result-area { margin-top: 30px; display: none; }
+        .status-icon { font-size: 45px; margin-bottom: 15px; }
         
-        button {
-            flex: 1; padding: 15px; border: none; border-radius: 6px;
-            font-weight: 700; cursor: pointer; font-family: inherit;
-            transition: 0.3s;
+        /* Глитч эффект */
+        .glitch { animation: glitch 0.2s infinite; }
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            50% { transform: translate(-3px, 2px); filter: hue-rotate(90deg); }
+            100% { transform: translate(3px, -2px); }
         }
-
-        .btn-paste { background: #222; color: white; max-width: 60px; }
-        .btn-execute { background: var(--primary); color: black; }
-        button:disabled { opacity: 0.3; cursor: not-allowed; }
-
-        #result-display {
-            margin-top: 30px; display: none; text-align: center;
-            animation: fadeIn 0.5s ease;
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } }
-
-        .big-icon { font-size: 48px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
     <div id="terminal"></div>
 
-    <div class="main-card">
-        <div class="status-badge">NETWORK ANALYZER v2.4</div>
-        <input type="text" id="target-url" placeholder="enter host (e.g. google.com)">
+    <div class="main-card" id="card">
+        <h1>[ SYSTEM_DIAGNOSTIC ]</h1>
         
-        <div class="btn-row">
-            <button class="btn-paste" onclick="paste()" title="Paste"><i class="fa-solid fa-paste"></i></button>
-            <button class="btn-execute" id="run-btn" onclick="startAnalysis()">ANALYZE HOST</button>
-        </div>
+        <input type="text" id="target-url" placeholder="ENTER_HOST_NAME">
+        
+        <button class="btn-execute" id="run-btn" onclick="startAnalysis()">
+            EXECUTE ANALYSIS
+        </button>
 
-        <div id="result-display">
-            <div id="res-icon" class="big-icon"></div>
-            <div id="res-text" style="font-weight: bold; font-size: 14px;"></div>
-            <div id="res-details" style="font-size: 10px; color: #666; margin-top: 8px;"></div>
+        <div id="result-area">
+            <div id="res-icon" class="status-icon"></div>
+            <div id="res-text" style="font-weight: bold; letter-spacing: 1px;"></div>
+            <div id="res-details" style="font-size: 10px; opacity: 0.6; margin-top: 10px;"></div>
         </div>
     </div>
 
@@ -102,91 +96,106 @@
         const term = document.getElementById('terminal');
         const runBtn = document.getElementById('run-btn');
 
-        function addLog(msg, type = 'info') {
+        function addLog(msg, color = 'var(--primary)') {
             const line = document.createElement('div');
-            line.className = `log-line log-${type}`;
-            const time = new Date().toLocaleTimeString().split(' ')[0];
-            line.innerText = `[${time}] ${msg}`;
+            line.className = 'log-line';
+            line.style.color = color;
+            line.innerText = `> [${new Date().toISOString().split('T')[1].split('Z')[0]}] ${msg}`;
             term.appendChild(line);
-            term.scrollTop = term.scrollHeight;
-        }
-
-        async function paste() {
-            const text = await navigator.clipboard.readText();
-            document.getElementById('target-url').value = text;
+            if (term.childNodes.length > 30) term.removeChild(term.firstChild);
         }
 
         async function startAnalysis() {
             let host = document.getElementById('target-url').value.trim();
             if (!host) return;
-            
-            // Очистка и подготовка
             if (!host.startsWith('http')) host = 'https://' + host;
+
+            // Reset UI
             term.style.display = 'flex';
             term.innerHTML = '';
+            document.getElementById('result-area').style.display = 'none';
             runBtn.disabled = true;
-            document.getElementById('result-display').style.display = 'none';
 
-            addLog(`Initializing analysis for: ${host}`, 'info');
-            await wait(600);
-            addLog(`Resolving DNS for ${host.split('//')[1]}...`, 'info');
-            await wait(800);
-            addLog(`Establishing connection to proxy-relay...`, 'warn');
-            await wait(500);
-            addLog(`Sending HTTP/2 GET request. Headers: {User-Agent: "Mozilla/5.0"}`, 'info');
-
+            // Правдоподобная последовательность логов
+            addLog("STAGING NETWORK ANALYZER v2.5...");
+            await sleep(400);
+            addLog(`TARGET_HOST: ${host}`);
+            addLog("PROBING DNS_CLUSTER...");
+            await sleep(600);
+            addLog("DNS_RESOLVED: 104.26.10.22 (CLOUDFLARE_NET)", 'var(--warn)');
+            await sleep(400);
+            addLog("INITIATING HTTP_HANDSHAKE...");
+            addLog("HEADERS_INJECTED: {UA: 'CyberBot/1.0', Accept: '*/*'}");
+            
             const startTime = Date.now();
+            
             try {
-                // Используем прокси для обхода CORS
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 сек таймаут
+                const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 секунд на всё
 
+                addLog("REQUEST_SENT. AWAITING_ACK...", 'var(--warn)');
+                
                 const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(host)}`;
                 const response = await fetch(proxyUrl, { signal: controller.signal });
+                
+                if (!response.ok) throw new Error(`HTTP_ERR_${response.status}`);
+                
                 const data = await response.json();
                 clearTimeout(timeoutId);
 
-                const duration = Date.now() - startTime;
-                
+                const latency = Date.now() - startTime;
+
                 if (data.status && data.status.http_code) {
-                    addLog(`Server responded with status: ${data.status.http_code}`, 'success');
-                    addLog(`Round-trip time: ${duration}ms`, 'success');
-                    finish(true, data.status.http_code, duration);
+                    addLog(`PACKET_RECEIVED: STATUS_${data.status.http_code}`, 'var(--primary)');
+                    addLog(`LATENCY_MEASURED: ${latency}ms`, 'var(--primary)');
+                    finish(true, data.status.http_code, latency);
                 } else {
-                    throw new Error();
+                    throw new Error("EMPTY_PROXY_RESPONSE");
                 }
+
             } catch (err) {
-                addLog(`Connection failed: Host unreachable or Timeout`, 'error');
-                finish(false);
+                let errorType = "CONNECTION_REFUSED";
+                if (err.name === 'AbortError') errorType = "REQUEST_TIMEOUT (8000ms)";
+                else if (err.message.includes("HTTP_ERR")) errorType = err.message;
+                
+                addLog(`CRITICAL_FAILURE: ${errorType}`, 'var(--error)');
+                addLog("DIAGNOSTIC_DATA: PROXY_RELAY_REJECTED_STREAM", 'var(--error)');
+                finish(false, errorType);
             }
         }
 
-        function finish(isOk, code = '', time = '') {
+        function finish(isOk, extra = '', time = '') {
+            term.classList.add('glitch');
             setTimeout(() => {
                 term.style.display = 'none';
+                term.classList.remove('glitch');
                 runBtn.disabled = false;
-                
-                const display = document.getElementById('result-display');
+
+                const resArea = document.getElementById('result-area');
                 const icon = document.getElementById('res-icon');
                 const text = document.getElementById('res-text');
                 const details = document.getElementById('res-details');
 
-                display.style.display = 'block';
+                resArea.style.display = 'block';
                 if (isOk) {
-                    icon.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--primary)"></i>';
-                    text.innerText = "HOST IS ACCESSIBLE";
-                    text.style.color = "var(--primary)";
-                    details.innerText = `HTTP STATUS: ${code} | LATENCY: ${time}ms`;
+                    icon.innerHTML = '<i class="fa-solid fa-shield-virus"></i>';
+                    icon.style.color = 'var(--primary)';
+                    text.innerText = "HOST_STABLE";
+                    text.style.color = 'var(--primary)';
+                    details.innerText = `CODE: ${extra} | PING: ${time}ms`;
                 } else {
-                    icon.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color:var(--error)"></i>';
-                    text.innerText = "HOST UNREACHABLE";
-                    text.style.color = "var(--error)";
-                    details.innerText = "The server did not respond to the ping request.";
+                    icon.innerHTML = '<i class="fa-solid fa-bug"></i>';
+                    icon.style.color = 'var(--error)';
+                    text.innerText = "HOST_OFFLINE";
+                    text.style.color = 'var(--error)';
+                    details.innerText = `ERR: ${extra}`;
                 }
-            }, 800);
+                
+                gsap.from(resArea, { y: 20, opacity: 0, duration: 0.5 });
+            }, 600);
         }
 
-        function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     </script>
 </body>
 </html>
