@@ -3,7 +3,7 @@
 </p>
 
 # Blame My Internet (BMI)  
-## aka **BlameNet**
+## **BlameNet**
 
 **BlameNet** is a network verification tool built to answer one question only:
 
