@@ -6,13 +6,13 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon.jpg">
-    <link rel="icon" href="icon.jpg">
+    <meta name="apple-mobile-web-app-title" content="BlameNet">
+    <link rel="apple-touch-icon" href="icon.jpg?v=1">
+    <link rel="icon" href="icon.jpg?v=1">
 
     <title>Blame My Internet</title>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     
     <style>
         :root {
@@ -37,7 +37,7 @@
             position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.4;
         }
 
-        /* ТОТ САМЫЙ ДИЗАЙН КАРТОЧКИ */
+        /* ЧИСТЫЙ CSS ПЕРВОГО ВАРИАНТА */
         .main-card {
             position: relative;
             z-index: 10;
@@ -49,6 +49,7 @@
             border-radius: 4px;
             text-align: center;
             box-shadow: 0 0 30px rgba(0, 255, 65, 0.1);
+            transform: none !important; /* ЗАПРЕТ НА СДВИГ */
         }
 
         h1 { font-size: 0.9rem; letter-spacing: 3px; margin-bottom: 20px; color: var(--primary); }
@@ -59,9 +60,8 @@
             width: 100%; background: #000; border: 1px solid #1a3a1a;
             padding: 12px 45px 12px 12px; border-radius: 0;
             color: var(--primary); font-size: 14px; outline: none;
-            font-family: inherit; transition: border 0.3s;
+            font-family: inherit;
         }
-        input:focus { border-color: var(--primary); }
 
         .paste-btn {
             position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
@@ -89,12 +89,19 @@
             padding: 10px;
         }
 
-        .log-line {
-            font-size: 10px; color: var(--primary); margin-bottom: 4px;
-            opacity: 0.8; white-space: pre-wrap;
+        .log-line { font-size: 10px; color: var(--primary); margin-bottom: 4px; opacity: 0.8; }
+
+        #result-area { 
+            margin-top: 20px; 
+            display: none; 
+            animation: fadeIn 0.3s ease; 
         }
 
-        #result-area { margin-top: 20px; display: none; height: 70px; }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
         .status-icon { font-size: 36px; margin-bottom: 10px; }
     </style>
 </head>
@@ -102,7 +109,7 @@
 
     <canvas id="pixel-canvas"></canvas>
 
-    <div class="main-card" id="card">
+    <div class="main-card">
         <h1>BLAME MY INTERNET</h1>
         
         <div class="input-group">
@@ -117,7 +124,7 @@
         </button>
 
         <div id="log-container">
-            <div class="log-line">> SYSTEM_IDLE...</div>
+            <div class="log-line">> SYSTEM_READY</div>
         </div>
         
         <div id="result-area">
@@ -136,7 +143,7 @@
         let isRunning = false;
         let controller = null;
         let pixelInterval = null;
-        let fakeLogInterval = null;
+        let logInterval = null;
 
         function addLog(text, color = 'var(--primary)') {
             const line = document.createElement('div');
@@ -148,120 +155,98 @@
         }
 
         function handleAction() {
-            if (isRunning) {
-                stopEverything("TERMINATED_BY_USER");
-            } else {
-                startSequence();
-            }
+            if (isRunning) { stopAll("ABORTED"); } else { start(); }
         }
 
-        function stopEverything(msg) {
+        function stopAll(msg) {
             isRunning = false;
             if (controller) controller.abort();
-            
             clearInterval(pixelInterval);
-            clearInterval(fakeLogInterval);
-            
+            clearInterval(logInterval);
             btnMain.innerText = "EXECUTE SCAN";
             btnMain.classList.remove('abort');
-            
-            // Чистим старые анимации GSAP, чтобы карточка не улетала
-            gsap.killTweensOf("#result-area");
-            
             if (msg) addLog(msg, 'var(--error)');
         }
 
-        async function startSequence() {
-            const target = urlInput.value.trim();
-            if(!target) return;
-            
-            stopEverything(); 
+        async function start() {
+            const val = urlInput.value.trim();
+            if(!val) return;
+
+            stopAll();
             isRunning = true;
-            
             btnMain.innerText = "ABORT_SEQUENCE";
             btnMain.classList.add('abort');
             logContainer.innerHTML = '';
             resultArea.style.display = 'none';
 
-            // Пиксели кнопки
             pixelInterval = setInterval(() => {
-                const pixel = document.createElement('div');
-                pixel.className = 'btn-pixel';
+                const p = document.createElement('div');
+                p.className = 'btn-pixel';
                 const w = Math.random() * 40 + 10;
-                pixel.style.width = w + 'px';
-                pixel.style.left = Math.random() * (btnMain.offsetWidth - w) + 'px';
-                pixel.style.top = Math.random() * (btnMain.offsetHeight - 3) + 'px';
-                btnMain.appendChild(pixel);
-                setTimeout(() => pixel.remove(), 150);
+                p.style.width = w + 'px';
+                p.style.left = Math.random() * (btnMain.offsetWidth - w) + 'px';
+                p.style.top = Math.random() * (btnMain.offsetHeight - 3) + 'px';
+                btnMain.appendChild(p);
+                setTimeout(() => p.remove(), 150);
             }, 50);
 
-            addLog("INITIALIZING CONNECT...");
+            addLog("PROBE_STARTED...");
             controller = new AbortController();
 
-            // Фейковые логи в процессе
-            const fakeSteps = ["RESOLVING_DNS...", "STRETCHING_PACKETS...", "BYPASSING_WAF...", "PROBING_NODES..."];
-            let sIdx = 0;
-            fakeLogInterval = setInterval(() => {
-                if(sIdx < fakeSteps.length) addLog(fakeSteps[sIdx++]);
+            const steps = ["RESOLVING...", "BYPASSING...", "PACKET_INJECT...", "SYNCING..."];
+            let s = 0;
+            logInterval = setInterval(() => {
+                if(s < steps.length) addLog(steps[s++]);
             }, 700);
 
-            const checkTask = checkHost(target);
-            const minTime = new Promise(r => setTimeout(r, 3000));
+            const check = checkSite(val);
+            const wait = new Promise(r => setTimeout(r, 3000));
 
             try {
-                const [res] = await Promise.all([checkTask, minTime]);
-                if (isRunning) finish(res.ok, res.latency);
-            } catch(e) {
-                if (isRunning) finish(false, 0);
+                const [res] = await Promise.all([check, wait]);
+                if (isRunning) showResult(res.ok, res.lat);
+            } catch {
+                if (isRunning) showResult(false, 0);
             }
         }
 
-        async function checkHost(target) {
-            let cleanUrl = target.startsWith('http') ? target : 'https://' + target;
+        async function checkSite(t) {
+            let u = t.startsWith('http') ? t : 'https://' + t;
             const start = Date.now();
             try {
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(cleanUrl)}`;
-                const response = await fetch(proxyUrl, { signal: controller.signal });
-                const data = await response.json();
-                return { ok: !!(data.status && data.status.http_code), latency: Date.now() - start };
-            } catch {
-                return { ok: false, latency: 0 };
-            }
+                const p = `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`;
+                const r = await fetch(p, { signal: controller.signal });
+                const d = await r.json();
+                return { ok: !!(d.status && d.status.http_code), lat: Date.now() - start };
+            } catch { return { ok: false, lat: 0 }; }
         }
 
-        function finish(isOk, latency) {
-            stopEverything();
-            
+        function showResult(ok, lat) {
+            stopAll();
             resultArea.style.display = 'block';
-            document.getElementById('icon-success').style.display = isOk ? 'block' : 'none';
-            document.getElementById('icon-fail').style.display = isOk ? 'none' : 'block';
-            
-            const stText = document.getElementById('status-text');
-            stText.innerText = isOk ? `AVAILABLE (${latency}ms)` : "NOT AVAILABLE";
-            stText.style.color = isOk ? "var(--primary)" : "var(--error)";
-
-            if(!isOk) addLog("ERR: HOST_UNREACHABLE", 'var(--error)');
-            
-            // Анимация без накопления сдвигов
-            gsap.fromTo(resultArea, {opacity: 0, y: 10}, {opacity: 1, y: 0, duration: 0.3});
+            document.getElementById('icon-success').style.display = ok ? 'block' : 'none';
+            document.getElementById('icon-fail').style.display = ok ? 'none' : 'block';
+            const txt = document.getElementById('status-text');
+            txt.innerText = ok ? `AVAILABLE (${lat}ms)` : "NOT AVAILABLE";
+            txt.style.color = ok ? "var(--primary)" : "var(--error)";
+            if(!ok) addLog("SIGNAL_LOST", 'var(--error)');
         }
 
         async function pasteFromClipboard() {
-            try {
-                const text = await navigator.clipboard.readText();
-                urlInput.value = text;
-            } catch(e) {}
+            const t = await navigator.clipboard.readText();
+            urlInput.value = t;
         }
 
-        const canvas = document.getElementById('pixel-canvas');
-        const ctx = canvas.getContext('2d');
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.onresize = resize; resize();
+        // BG
+        const c = document.getElementById('pixel-canvas');
+        const x = c.getContext('2d');
+        function res() { c.width = window.innerWidth; c.height = window.innerHeight; }
+        window.onresize = res; res();
         function draw() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#00ff41";
-            for(let i=0; i<20; i++) ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+            x.fillStyle = "rgba(0,0,0,0.15)";
+            x.fillRect(0,0,c.width,c.height);
+            x.fillStyle = "#00ff41";
+            for(let i=0; i<20; i++) x.fillRect(Math.random()*c.width, Math.random()*c.height, 2, 2);
             requestAnimationFrame(draw);
         }
         draw();
