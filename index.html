@@ -8,7 +8,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="BlameNet">
     <link rel="apple-touch-icon" href="icon.png">
-    <link rel="apple-touch-icon" href="icon.jpg">
 
     <title>Blame My Internet</title>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
@@ -68,14 +67,24 @@
             background: none; border: none; color: var(--primary); cursor: pointer; opacity: 0.7;
         }
 
+        /* ТА САМАЯ КНОПКА */
         .check-btn {
             width: 100%; padding: 15px; background: var(--primary);
             color: black; border: none; font-weight: 900;
             cursor: pointer; letter-spacing: 1px; position: relative;
             overflow: hidden; text-transform: uppercase;
+            transition: background 0.3s;
         }
         
         .check-btn.abort { background: var(--error); color: white; }
+
+        .btn-pixel {
+            position: absolute;
+            background: white;
+            height: 3px;
+            pointer-events: none;
+            z-index: 5;
+        }
 
         #log-container {
             height: 180px; overflow-y: auto;
@@ -92,7 +101,6 @@
         #result-area { margin-top: 20px; display: none; }
         .status-icon { font-size: 36px; margin-bottom: 10px; }
         
-        /* Скроллбар терминала */
         #log-container::-webkit-scrollbar { width: 3px; }
         #log-container::-webkit-scrollbar-thumb { background: var(--primary); }
     </style>
@@ -132,6 +140,18 @@
         const btnMain = document.getElementById('btn-main');
         let isRunning = false;
         let controller = null;
+        let pixelInterval = null;
+
+        function createButtonPixels() {
+            const pixel = document.createElement('div');
+            pixel.className = 'btn-pixel';
+            const width = Math.random() * 40 + 10;
+            pixel.style.width = width + 'px';
+            pixel.style.left = Math.random() * (btnMain.offsetWidth - width) + 'px';
+            pixel.style.top = Math.random() * (btnMain.offsetHeight - 3) + 'px';
+            btnMain.appendChild(pixel);
+            setTimeout(() => pixel.remove(), 150);
+        }
 
         function addLog(text, color = 'var(--primary)') {
             const line = document.createElement('div');
@@ -142,13 +162,25 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        async function handleAction() {
+        function handleAction() {
             if (isRunning) {
-                if (controller) controller.abort();
-                stopSequence("TERMINATED_BY_OPERATOR");
-                return;
+                abortSequence();
+            } else {
+                startSequence();
             }
-            startSequence();
+        }
+
+        function abortSequence() {
+            if (controller) controller.abort();
+            cleanupUI();
+            addLog("SEQUENCE_TERMINATED_BY_USER", 'var(--error)');
+        }
+
+        function cleanupUI() {
+            isRunning = false;
+            clearInterval(pixelInterval);
+            btnMain.innerText = "EXECUTE SCAN";
+            btnMain.classList.remove('abort');
         }
 
         async function startSequence() {
@@ -158,6 +190,7 @@
             isRunning = true;
             btnMain.innerText = "ABORT_SEQUENCE";
             btnMain.classList.add('abort');
+            pixelInterval = setInterval(createButtonPixels, 50);
             
             logContainer.innerHTML = '';
             document.getElementById('result-area').style.display = 'none';
@@ -167,58 +200,49 @@
             addLog(`RESOLVING DNS: ${target}`);
             
             controller = new AbortController();
-            checkAvailability(target);
+            
+            // Запускаем реальный запрос и фейковую задержку параллельно
+            const startTime = Date.now();
+            const minWait = sleep(3000); // Принудительные 3 секунды
+            const checkTask = checkAvailability(target);
+
+            // Ждем завершения обоих событий (но не меньше 3 сек)
+            await minWait;
+            if (isRunning) {
+                const result = await checkTask;
+                finish(result.ok, result.latency);
+            }
         }
 
         async function checkAvailability(target) {
             let cleanUrl = target.startsWith('http') ? target : 'https://' + target;
-            const startTime = Date.now();
+            const start = Date.now();
             
-            // Имитация "попыток" в консоли, если запрос долгий
-            let attempts = 0;
-            const fakeAttempts = setInterval(() => {
-                if (!isRunning) return clearInterval(fakeAttempts);
-                attempts++;
-                const logs = [
-                    "RETRYING PACKET_SEND...",
-                    "BYPASSING TIMEOUT...",
-                    "CHANGING NODE...",
-                    "RE-ROUTING TRAFFIC..."
-                ];
-                addLog(logs[Math.floor(Math.random() * logs.length)], 'rgba(0, 255, 65, 0.4)');
-            }, 1200);
+            // Имитация шагов в логе во время ожидания
+            const steps = ["STRETCHING_PACKETS...", "BYPASSING_FIREWALL...", "PROBING_PORTS...", "HANDSHAKE_INIT..."];
+            let i = 0;
+            const logInterval = setInterval(() => {
+                if(isRunning && i < steps.length) addLog(steps[i++], 'rgba(0, 255, 65, 0.4)');
+            }, 700);
 
             try {
                 const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(cleanUrl)}`;
                 const res = await fetch(proxyUrl, { signal: controller.signal });
                 const data = await res.json();
+                clearInterval(logInterval);
                 
-                clearInterval(fakeAttempts);
-                const latency = Date.now() - startTime;
-
-                if (data.status && data.status.http_code) {
-                    addLog(`RECV STATUS: ${data.status.http_code}`);
-                    addLog(`LATENCY: ${latency}ms`);
-                    finish(true, latency);
-                } else { throw new Error(); }
+                return { 
+                    ok: !!(data.status && data.status.http_code), 
+                    latency: Date.now() - start 
+                };
             } catch (err) {
-                clearInterval(fakeAttempts);
-                if (err.name !== 'AbortError') {
-                    addLog("ERR: HOST_UNREACHABLE", 'var(--error)');
-                    finish(false);
-                }
+                clearInterval(logInterval);
+                return { ok: false, latency: 0 };
             }
         }
 
-        function stopSequence(reason) {
-            isRunning = false;
-            btnMain.innerText = "EXECUTE SCAN";
-            btnMain.classList.remove('abort');
-            if (reason) addLog(reason, 'var(--error)');
-        }
-
         function finish(isOk, latency) {
-            stopSequence();
+            cleanupUI();
             const statusText = document.getElementById('status-text');
             const iconSuccess = document.getElementById('icon-success');
             const iconFail = document.getElementById('icon-fail');
@@ -230,29 +254,29 @@
             statusText.innerText = isOk ? `AVAILABLE (${latency}ms)` : "NOT AVAILABLE";
             statusText.style.color = isOk ? "var(--primary)" : "var(--error)";
 
-            gsap.from("#result-area", {y: 10, opacity: 0, duration: 0.3});
+            if (!isOk) addLog("ERR: HOST_UNREACHABLE", 'var(--error)');
+            gsap.from("#result-area", {scale: 0.8, opacity: 0, duration: 0.3});
         }
 
         async function pasteFromClipboard() {
-            const text = await navigator.clipboard.readText();
-            urlInput.value = text;
+            try {
+                const text = await navigator.clipboard.readText();
+                urlInput.value = text;
+            } catch(e) {}
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-        // Background
+        // BG Canvas
         const canvas = document.getElementById('pixel-canvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize; resize();
-
         function draw() {
             ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#00ff41";
-            for(let i=0; i<20; i++) {
-                ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
-            }
+            for(let i=0; i<20; i++) ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
             requestAnimationFrame(draw);
         }
         draw();
