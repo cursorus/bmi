@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title> Blame My Internet</title>
+    <title>Blame My Internet // Terminal</title>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -13,9 +13,8 @@
             --bg: #050505;
             --primary: #00ff41;
             --error: #ff3131;
+            --dim: #1a3a1a;
         }
-
-        * { box-sizing: border-box; }
 
         body {
             margin: 0; padding: 0;
@@ -28,129 +27,105 @@
         }
 
         #pixel-canvas {
-            position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.4;
+            position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.3;
         }
 
-        /* ОСНОВНАЯ КАРТОЧКА */
         .main-card {
             position: relative;
             z-index: 10;
             width: 90%;
             max-width: 420px;
-            background: rgba(10, 10, 10, 0.98);
+            background: rgba(5, 5, 5, 0.95);
             border: 1px solid var(--primary);
             padding: 25px;
-            border-radius: 4px;
+            border-radius: 2px;
             text-align: center;
-            box-shadow: 0 0 30px rgba(0, 255, 65, 0.1);
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.05);
         }
 
-        h1 { font-size: 0.9rem; letter-spacing: 3px; margin-bottom: 20px; color: var(--primary); }
+        h1 { font-size: 0.8rem; letter-spacing: 4px; margin-bottom: 20px; color: var(--primary); opacity: 0.8; }
 
-        .input-group { position: relative; margin-bottom: 15px; }
+        .input-group { position: relative; margin-bottom: 10px; }
 
         input {
-            width: 100%; background: #000; border: 1px solid #1a3a1a;
+            width: 100%; background: #000; border: 1px solid var(--dim);
             padding: 12px 45px 12px 12px; border-radius: 0;
             color: var(--primary); font-size: 14px; outline: none;
-            font-family: inherit; transition: border 0.3s;
+            font-family: inherit;
         }
         input:focus { border-color: var(--primary); }
 
         .paste-btn {
             position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-            background: none; border: none; color: var(--primary); cursor: pointer; opacity: 0.7;
+            background: none; border: none; color: var(--primary); cursor: pointer; opacity: 0.5;
         }
 
-        /* КНОПКА С ПИКСЕЛЯМИ */
         .check-btn {
             width: 100%; padding: 15px; background: var(--primary);
             color: black; border: none; font-weight: 900;
             cursor: pointer; letter-spacing: 1px; position: relative;
-            overflow: hidden; text-transform: uppercase;
+            text-transform: uppercase; transition: all 0.2s;
         }
+        .check-btn:active { transform: scale(0.98); }
+        .check-btn.abort { background: var(--error); color: white; }
 
-        .btn-pixel {
-            position: absolute;
-            background: white;
-            height: 3px;
-            pointer-events: none;
-            z-index: 5;
-        }
-
-        /* ТЕРМИНАЛ ВНУТРИ КАРТОЧКИ */
+        /* ТЕРМИНАЛ ВСЕГДА ОТКРЫТ */
         #log-container {
-            height: 0; overflow: hidden;
-            background: #000; margin-top: 15px;
-            text-align: left; border: 0px solid #1a3a1a;
-            transition: all 0.5s ease;
-        }
-
-        #log-container.active {
-            height: 180px; border-width: 1px; padding: 10px;
-            overflow-y: auto;
+            height: 160px; overflow-y: auto;
+            background: rgba(0,0,0,0.5); margin-top: 15px;
+            text-align: left; border: 1px solid var(--dim);
+            padding: 10px; scroll-behavior: smooth;
         }
 
         .log-line {
             font-size: 10px; color: var(--primary); margin-bottom: 4px;
-            opacity: 0.8; white-space: nowrap;
+            opacity: 0.8; font-family: 'Fira Code', monospace;
         }
 
-        .toggle-log {
-            font-size: 10px; color: #555; cursor: pointer;
-            margin-top: 15px; text-decoration: underline;
-            background: none; border: none; font-family: inherit;
-        }
-        .toggle-log:hover { color: var(--primary); }
-
-        #result-area { margin-top: 20px; display: none; }
-        .status-icon { font-size: 36px; margin-bottom: 10px; }
+        #result-area { margin-top: 15px; min-height: 60px; }
+        .status-icon { font-size: 28px; margin-bottom: 5px; }
+        
+        /* Скроллбар */
+        #log-container::-webkit-scrollbar { width: 4px; }
+        #log-container::-webkit-scrollbar-thumb { background: var(--dim); }
     </style>
 </head>
 <body>
 
     <canvas id="pixel-canvas"></canvas>
 
-    <div class="main-card" id="card">
-        <h1>BLAME MY INTERNET</h1>
+    <div class="main-card">
+        <h1>// NETWORK_PROBE_V1</h1>
         
         <div class="input-group">
-            <input type="text" id="url-input" placeholder="HOST_ADDRESS">
+            <input type="text" id="url-input" placeholder="HOST_IP_OR_URL" autocomplete="off">
             <button class="paste-btn" onclick="pasteFromClipboard()">
                 <i class="fa-solid fa-paste"></i>
             </button>
         </div>
 
-        <button class="check-btn" id="btn-check" onclick="startSequence()">
+        <button class="check-btn" id="btn-main" onclick="handleAction()">
             EXECUTE SCAN
         </button>
 
-        <div id="log-container"></div>
-        
-        <button class="toggle-log" onclick="toggleLog()">[ SHOW_CONSOLE ]</button>
+        <div id="log-container">
+            <div class="log-line">> SYSTEM READY...</div>
+            <div class="log-line">> WAITING FOR TARGET_HOST</div>
+        </div>
 
         <div id="result-area">
-            <div id="icon-success" class="status-icon" style="color:var(--primary)"><i class="fa-solid fa-shield-halved"></i></div>
-            <div id="icon-fail" class="status-icon" style="color:var(--error)"><i class="fa-solid fa-triangle-exclamation"></i></div>
-            <div id="status-text" style="font-size: 12px; font-weight: bold;"></div>
+            <div id="icon-success" class="status-icon" style="color:var(--primary); display:none"><i class="fa-solid fa-shield-halved"></i></div>
+            <div id="icon-fail" class="status-icon" style="color:var(--error); display:none"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div id="status-text" style="font-size: 11px; font-weight: bold; letter-spacing: 1px;"></div>
         </div>
     </div>
 
     <script>
         const logContainer = document.getElementById('log-container');
         const urlInput = document.getElementById('url-input');
-        const btnCheck = document.getElementById('btn-check');
-        let pixelInterval;
-
-        async function pasteFromClipboard() {
-            const text = await navigator.clipboard.readText();
-            urlInput.value = text;
-        }
-
-        function toggleLog() {
-            logContainer.classList.toggle('active');
-        }
+        const btnMain = document.getElementById('btn-main');
+        let isRunning = false;
+        let controller = null;
 
         function addLog(text, color = 'var(--primary)') {
             const line = document.createElement('div');
@@ -161,38 +136,43 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        function createButtonPixels() {
-            const pixel = document.createElement('div');
-            pixel.className = 'btn-pixel';
-            const width = Math.random() * 40 + 10;
-            pixel.style.width = width + 'px';
-            pixel.style.left = Math.random() * (btnCheck.offsetWidth - width) + 'px';
-            pixel.style.top = Math.random() * (btnCheck.offsetHeight - 3) + 'px';
-            btnCheck.appendChild(pixel);
-            setTimeout(() => pixel.remove(), 150);
+        async function handleAction() {
+            if (isRunning) {
+                abortSequence();
+                return;
+            }
+            startSequence();
+        }
+
+        function abortSequence() {
+            if (controller) controller.abort();
+            isRunning = false;
+            btnMain.innerText = "EXECUTE SCAN";
+            btnMain.classList.remove('abort');
+            addLog("SEQUENCE_ABORTED_BY_USER", 'var(--error)');
         }
 
         async function startSequence() {
             let target = urlInput.value.trim();
-            if(!target) return;
+            if(!target) {
+                addLog("ERR: NO_TARGET_SPECIFIED", 'var(--error)');
+                return;
+            }
             
-            // UI Setup
-            btnCheck.innerText = "EXECUTING...";
-            btnCheck.disabled = true;
-            pixelInterval = setInterval(createButtonPixels, 50);
+            isRunning = true;
+            btnMain.innerText = "ABORT_SEQUENCE";
+            btnMain.classList.add('abort');
             
-            if(!logContainer.classList.contains('active')) toggleLog();
             logContainer.innerHTML = '';
-            document.getElementById('result-area').style.display = 'none';
+            document.getElementById('icon-success').style.display = 'none';
+            document.getElementById('icon-fail').style.display = 'none';
+            document.getElementById('status-text').innerText = '';
 
-            // Logs
-            addLog("INITIALIZING CONNECT...");
-            await sleep(400);
-            addLog(`RESOLVING DNS: ${target}`);
-            await sleep(600);
-            addLog("PACKET_SIZE: 64 BYTES");
-            addLog("REQUEST_HEADERS: SENDING...");
-
+            addLog("INITIALIZING PROBE...");
+            await sleep(500);
+            addLog(`TARGET: ${target}`);
+            
+            controller = new AbortController();
             checkAvailability(target);
         }
 
@@ -200,56 +180,81 @@
             let cleanUrl = target.startsWith('http') ? target : 'https://' + target;
             const startTime = Date.now();
             
+            // Фейковые шаги для "хакерского" вида
+            const fakeSteps = [
+                "BYPASSING CLOUDFLARE_EDGE...",
+                "TUNNELING THROUGH PROXY_NODE...",
+                "ATTEMPTING HANDSHAKE (TCP)...",
+                "STRETCHING PACKET DATA...",
+                "RETRYING VIA ALTERNATE PORT...",
+                "ANALYZING HOP_COUNT..."
+            ];
+
+            let stepIdx = 0;
+            const stepInterval = setInterval(() => {
+                if (isRunning && stepIdx < fakeSteps.length) {
+                    addLog(fakeSteps[stepIdx], 'rgba(0, 255, 65, 0.5)');
+                    stepIdx++;
+                }
+            }, 800);
+
             try {
                 const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(cleanUrl)}`;
-                const res = await fetch(proxyUrl);
-                const data = await res.json();
+                const response = await fetch(proxyUrl, { signal: controller.signal });
+                const data = await response.json();
+                
+                clearInterval(stepInterval);
                 const latency = Date.now() - startTime;
 
                 if (data.status && data.status.http_code) {
                     addLog(`RECV STATUS: ${data.status.http_code}`, 'var(--primary)');
-                    addLog(`LATENCY: ${latency}ms`, 'var(--primary)');
                     finish(true, latency);
                 } else { throw new Error(); }
-            } catch {
-                addLog("ERR: HOST_UNREACHABLE", 'var(--error)');
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                clearInterval(stepInterval);
+                addLog("ERR: CONNECTION_REFUSED", 'var(--error)');
                 finish(false);
             }
         }
 
         function finish(isOk, latency) {
-            clearInterval(pixelInterval);
-            btnCheck.innerText = "EXECUTE SCAN";
-            btnCheck.disabled = false;
+            isRunning = false;
+            btnMain.innerText = "EXECUTE SCAN";
+            btnMain.classList.remove('abort');
 
             const statusText = document.getElementById('status-text');
             const icon = isOk ? document.getElementById('icon-success') : document.getElementById('icon-fail');
             
-            document.getElementById('result-area').style.display = 'block';
-            document.getElementById('icon-success').style.display = 'none';
-            document.getElementById('icon-fail').style.display = 'none';
-            
             icon.style.display = 'block';
-            statusText.innerText = isOk ? `AVAILABLE (${latency}ms)` : "NOT AVAILABLE";
+            statusText.innerText = isOk ? `ONLINE // LATENCY: ${latency}ms` : "OFFLINE // UNREACHABLE";
             statusText.style.color = isOk ? "var(--primary)" : "var(--error)";
 
-            gsap.from(icon, {scale: 0.5, opacity: 0, duration: 0.5, ease: "back.out"});
+            gsap.from(icon, {scale: 0.5, opacity: 0, duration: 0.4, ease: "back.out"});
+        }
+
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                urlInput.value = text;
+                addLog("DATA_IMPORTED_FROM_CLIPBOARD");
+            } catch (e) {}
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-        // BG Canvas
+        // Background Animation
         const canvas = document.getElementById('pixel-canvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize; resize();
 
         function draw() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+            ctx.fillStyle = "rgba(5, 5, 5, 0.2)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#00ff41";
-            for(let i=0; i<25; i++) {
-                ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+            for(let i=0; i<15; i++) {
+                ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 1, 1);
             }
             requestAnimationFrame(draw);
         }
