@@ -126,7 +126,7 @@
         <input type="text" id="url-input" placeholder="HOST_ADDRESS" spellcheck="false">
 
         <button class="check-btn" id="btn-main" onclick="handleAction()">
-            EXECUTE SCAN
+            EXECUTE
         </button>
 
         <div id="log-container"></div>
@@ -178,7 +178,7 @@ function addLog(text, color = 'var(--console-green)') {
 }
 
 function handleAction() {
-    if (isRunning) stopAll("USER_ABORTED");
+    if (isRunning) stopAll("USER_CANCELED");
     else startSequence();
 }
 
@@ -186,9 +186,9 @@ function stopAll(reason = null) {
     isRunning = false;
     if (controller) controller.abort();
     clearInterval(pixelTimer);
-    btnMain.innerText = "EXECUTE SCAN";
+    btnMain.innerText = "EXECUTE";
     btnMain.classList.remove('abort');
-    if (reason) addLog(reason, reason === "USER_ABORTED" ? 'var(--error)' : 'var(--primary)');
+    if (reason) addLog(reason, reason === "USER_CANCELED" ? 'var(--error)' : 'var(--primary)');
 }
 
 async function startSequence() {
@@ -196,7 +196,7 @@ async function startSequence() {
     if (!target) return;
 
     if (!navigator.onLine) {
-        addLog("CRITICAL: NO_LOCAL_INTERNET", "var(--error)");
+        addLog("CRITICAL: OFFLINE", "var(--error)");
         finish(false, 0);
         return;
     }
@@ -205,7 +205,7 @@ async function startSequence() {
 
     stopAll(); 
     isRunning = true;
-    btnMain.innerText = "ABORT_SEQUENCE";
+    btnMain.innerText = "CANCEL";
     btnMain.classList.add('abort');
     logContainer.innerHTML = '';
     document.getElementById('result-area').style.display = 'none';
