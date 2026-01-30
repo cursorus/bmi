@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Advanced Network Scanner</title>
+    <title>Cyber Scan v2.5</title>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -13,189 +13,247 @@
             --bg: #050505;
             --primary: #00ff41;
             --error: #ff3131;
-            --warn: #f1c40f;
         }
+
+        * { box-sizing: border-box; }
 
         body {
-            margin: 0; padding: 0; background: var(--bg); color: white;
-            font-family: 'Fira Code', monospace; height: 100dvh;
-            display: flex; align-items: center; justify-content: center; overflow: hidden;
+            margin: 0; padding: 0;
+            background: var(--bg);
+            color: white;
+            font-family: 'Fira Code', monospace;
+            height: 100dvh;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
         }
 
-        /* ТЕРМИНАЛ (Снова красивый) */
-        #terminal {
-            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9);
-            z-index: 100; padding: 20px; display: none;
-            flex-direction: column; justify-content: flex-end;
+        #pixel-canvas {
+            position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.4;
+        }
+
+        /* ОСНОВНАЯ КАРТОЧКА */
+        .main-card {
+            position: relative;
+            z-index: 10;
+            width: 90%;
+            max-width: 420px;
+            background: rgba(10, 10, 10, 0.98);
+            border: 1px solid var(--primary);
+            padding: 25px;
+            border-radius: 4px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.1);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        h1 { font-size: 0.9rem; letter-spacing: 3px; margin-bottom: 20px; color: var(--primary); }
+
+        .input-group { position: relative; margin-bottom: 15px; }
+
+        input {
+            width: 100%; background: #000; border: 1px solid #1a3a1a;
+            padding: 12px 45px 12px 12px; border-radius: 0;
+            color: var(--primary); font-size: 14px; outline: none;
+            font-family: inherit; transition: border 0.3s;
+        }
+        input:focus { border-color: var(--primary); }
+
+        .paste-btn {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: var(--primary); cursor: pointer; opacity: 0.7;
+        }
+
+        /* КНОПКА С ПИКСЕЛЯМИ */
+        .check-btn {
+            width: 100%; padding: 15px; background: var(--primary);
+            color: black; border: none; font-weight: 900;
+            cursor: pointer; letter-spacing: 1px; position: relative;
+            overflow: hidden; text-transform: uppercase;
+        }
+
+        .btn-pixel {
+            position: absolute;
+            background: white;
+            height: 3px;
             pointer-events: none;
+            z-index: 5;
+        }
+
+        /* ТЕРМИНАЛ ВНУТРИ КАРТОЧКИ */
+        #log-container {
+            height: 0; overflow: hidden;
+            background: #000; margin-top: 15px;
+            text-align: left; border: 0px solid #1a3a1a;
+            transition: all 0.5s ease;
+        }
+
+        #log-container.active {
+            height: 180px; border-width: 1px; padding: 10px;
+            overflow-y: auto;
         }
 
         .log-line {
-            font-size: 11px; line-height: 1.4; margin-bottom: 4px;
-            text-shadow: 0 0 5px rgba(0,255,65,0.5);
+            font-size: 10px; color: var(--primary); margin-bottom: 4px;
+            opacity: 0.8; white-space: nowrap;
         }
 
-        /* КАРТОЧКА (Возвращаем неон) */
-        .main-card {
-            position: relative; z-index: 10; width: 90%; max-width: 420px;
-            background: rgba(15, 15, 15, 0.95);
-            border: 1px solid var(--primary);
-            padding: 40px 20px; border-radius: 4px; text-align: center;
-            box-shadow: 0 0 30px rgba(0, 255, 65, 0.15);
+        .toggle-log {
+            font-size: 10px; color: #555; cursor: pointer;
+            margin-top: 15px; text-decoration: underline;
+            background: none; border: none; font-family: inherit;
         }
+        .toggle-log:hover { color: var(--primary); }
 
-        h1 { font-size: 0.9rem; letter-spacing: 4px; color: var(--primary); margin-bottom: 30px; }
-
-        input {
-            width: 100%; background: #000; border: 1px solid var(--primary);
-            padding: 15px; color: var(--primary); font-family: inherit;
-            margin-bottom: 20px; outline: none; box-shadow: inset 0 0 10px rgba(0,255,65,0.1);
-        }
-
-        .btn-execute {
-            width: 100%; padding: 18px; background: var(--primary);
-            color: black; border: none; font-weight: 900; cursor: pointer;
-            letter-spacing: 2px; text-transform: uppercase; transition: 0.3s;
-        }
-        .btn-execute:hover { box-shadow: 0 0 20px var(--primary); }
-        .btn-execute:disabled { opacity: 0.4; filter: grayscale(1); }
-
-        #result-area { margin-top: 30px; display: none; }
-        .status-icon { font-size: 45px; margin-bottom: 15px; }
-        
-        /* Глитч эффект */
-        .glitch { animation: glitch 0.2s infinite; }
-        @keyframes glitch {
-            0% { transform: translate(0); }
-            50% { transform: translate(-3px, 2px); filter: hue-rotate(90deg); }
-            100% { transform: translate(3px, -2px); }
-        }
+        #result-area { margin-top: 20px; display: none; }
+        .status-icon { font-size: 36px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="terminal"></div>
+    <canvas id="pixel-canvas"></canvas>
 
     <div class="main-card" id="card">
-        <h1>[ SYSTEM_DIAGNOSTIC ]</h1>
+        <h1>SYS.SCAN_NETWORK v2.5</h1>
         
-        <input type="text" id="target-url" placeholder="ENTER_HOST_NAME">
-        
-        <button class="btn-execute" id="run-btn" onclick="startAnalysis()">
-            EXECUTE ANALYSIS
+        <div class="input-group">
+            <input type="text" id="url-input" placeholder="HOST_ADDRESS">
+            <button class="paste-btn" onclick="pasteFromClipboard()">
+                <i class="fa-solid fa-paste"></i>
+            </button>
+        </div>
+
+        <button class="check-btn" id="btn-check" onclick="startSequence()">
+            EXECUTE SCAN
         </button>
 
+        <div id="log-container"></div>
+        
+        <button class="toggle-log" onclick="toggleLog()">[ SHOW_CONSOLE ]</button>
+
         <div id="result-area">
-            <div id="res-icon" class="status-icon"></div>
-            <div id="res-text" style="font-weight: bold; letter-spacing: 1px;"></div>
-            <div id="res-details" style="font-size: 10px; opacity: 0.6; margin-top: 10px;"></div>
+            <div id="icon-success" class="status-icon" style="color:var(--primary)"><i class="fa-solid fa-shield-halved"></i></div>
+            <div id="icon-fail" class="status-icon" style="color:var(--error)"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div id="status-text" style="font-size: 12px; font-weight: bold;"></div>
         </div>
     </div>
 
     <script>
-        const term = document.getElementById('terminal');
-        const runBtn = document.getElementById('run-btn');
+        const logContainer = document.getElementById('log-container');
+        const urlInput = document.getElementById('url-input');
+        const btnCheck = document.getElementById('btn-check');
+        let pixelInterval;
 
-        function addLog(msg, color = 'var(--primary)') {
+        async function pasteFromClipboard() {
+            const text = await navigator.clipboard.readText();
+            urlInput.value = text;
+        }
+
+        function toggleLog() {
+            logContainer.classList.toggle('active');
+        }
+
+        function addLog(text, color = 'var(--primary)') {
             const line = document.createElement('div');
             line.className = 'log-line';
             line.style.color = color;
-            line.innerText = `> [${new Date().toISOString().split('T')[1].split('Z')[0]}] ${msg}`;
-            term.appendChild(line);
-            if (term.childNodes.length > 30) term.removeChild(term.firstChild);
+            line.innerText = `> ${text}`;
+            logContainer.appendChild(line);
+            logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        async function startAnalysis() {
-            let host = document.getElementById('target-url').value.trim();
-            if (!host) return;
-            if (!host.startsWith('http')) host = 'https://' + host;
+        function createButtonPixels() {
+            const pixel = document.createElement('div');
+            pixel.className = 'btn-pixel';
+            const width = Math.random() * 40 + 10;
+            pixel.style.width = width + 'px';
+            pixel.style.left = Math.random() * (btnCheck.offsetWidth - width) + 'px';
+            pixel.style.top = Math.random() * (btnCheck.offsetHeight - 3) + 'px';
+            btnCheck.appendChild(pixel);
+            setTimeout(() => pixel.remove(), 150);
+        }
 
-            // Reset UI
-            term.style.display = 'flex';
-            term.innerHTML = '';
-            document.getElementById('result-area').style.display = 'none';
-            runBtn.disabled = true;
-
-            // Правдоподобная последовательность логов
-            addLog("STAGING NETWORK ANALYZER v2.5...");
-            await sleep(400);
-            addLog(`TARGET_HOST: ${host}`);
-            addLog("PROBING DNS_CLUSTER...");
-            await sleep(600);
-            addLog("DNS_RESOLVED: 104.26.10.22 (CLOUDFLARE_NET)", 'var(--warn)');
-            await sleep(400);
-            addLog("INITIATING HTTP_HANDSHAKE...");
-            addLog("HEADERS_INJECTED: {UA: 'CyberBot/1.0', Accept: '*/*'}");
+        async function startSequence() {
+            let target = urlInput.value.trim();
+            if(!target) return;
             
+            // UI Setup
+            btnCheck.innerText = "CHECKING...";
+            btnCheck.disabled = true;
+            pixelInterval = setInterval(createButtonPixels, 50);
+            
+            if(!logContainer.classList.contains('active')) toggleLog();
+            logContainer.innerHTML = '';
+            document.getElementById('result-area').style.display = 'none';
+
+            // Logs
+            addLog("INITIALIZING CONNECT...");
+            await sleep(400);
+            addLog(`RESOLVING DNS: ${target}`);
+            await sleep(600);
+            addLog("PACKET_SIZE: 64 BYTES");
+            addLog("REQUEST_HEADERS: SENDING...");
+
+            checkAvailability(target);
+        }
+
+        async function checkAvailability(target) {
+            let cleanUrl = target.startsWith('http') ? target : 'https://' + target;
             const startTime = Date.now();
             
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 секунд на всё
-
-                addLog("REQUEST_SENT. AWAITING_ACK...", 'var(--warn)');
-                
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(host)}`;
-                const response = await fetch(proxyUrl, { signal: controller.signal });
-                
-                if (!response.ok) throw new Error(`HTTP_ERR_${response.status}`);
-                
-                const data = await response.json();
-                clearTimeout(timeoutId);
-
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(cleanUrl)}`;
+                const res = await fetch(proxyUrl);
+                const data = await res.json();
                 const latency = Date.now() - startTime;
 
                 if (data.status && data.status.http_code) {
-                    addLog(`PACKET_RECEIVED: STATUS_${data.status.http_code}`, 'var(--primary)');
-                    addLog(`LATENCY_MEASURED: ${latency}ms`, 'var(--primary)');
-                    finish(true, data.status.http_code, latency);
-                } else {
-                    throw new Error("EMPTY_PROXY_RESPONSE");
-                }
-
-            } catch (err) {
-                let errorType = "CONNECTION_REFUSED";
-                if (err.name === 'AbortError') errorType = "REQUEST_TIMEOUT (8000ms)";
-                else if (err.message.includes("HTTP_ERR")) errorType = err.message;
-                
-                addLog(`CRITICAL_FAILURE: ${errorType}`, 'var(--error)');
-                addLog("DIAGNOSTIC_DATA: PROXY_RELAY_REJECTED_STREAM", 'var(--error)');
-                finish(false, errorType);
+                    addLog(`RECV STATUS: ${data.status.http_code}`, 'var(--primary)');
+                    addLog(`LATENCY: ${latency}ms`, 'var(--primary)');
+                    finish(true, latency);
+                } else { throw new Error(); }
+            } catch {
+                addLog("ERR: HOST_UNREACHABLE", 'var(--error)');
+                finish(false);
             }
         }
 
-        function finish(isOk, extra = '', time = '') {
-            term.classList.add('glitch');
-            setTimeout(() => {
-                term.style.display = 'none';
-                term.classList.remove('glitch');
-                runBtn.disabled = false;
+        function finish(isOk, latency) {
+            clearInterval(pixelInterval);
+            btnCheck.innerText = "EXECUTE SCAN";
+            btnCheck.disabled = false;
 
-                const resArea = document.getElementById('result-area');
-                const icon = document.getElementById('res-icon');
-                const text = document.getElementById('res-text');
-                const details = document.getElementById('res-details');
+            const statusText = document.getElementById('status-text');
+            const icon = isOk ? document.getElementById('icon-success') : document.getElementById('icon-fail');
+            
+            document.getElementById('result-area').style.display = 'block';
+            document.getElementById('icon-success').style.display = 'none';
+            document.getElementById('icon-fail').style.display = 'none';
+            
+            icon.style.display = 'block';
+            statusText.innerText = isOk ? `AVAILABLE (${latency}ms)` : "NOT AVAILABLE";
+            statusText.style.color = isOk ? "var(--primary)" : "var(--error)";
 
-                resArea.style.display = 'block';
-                if (isOk) {
-                    icon.innerHTML = '<i class="fa-solid fa-shield-virus"></i>';
-                    icon.style.color = 'var(--primary)';
-                    text.innerText = "HOST_STABLE";
-                    text.style.color = 'var(--primary)';
-                    details.innerText = `CODE: ${extra} | PING: ${time}ms`;
-                } else {
-                    icon.innerHTML = '<i class="fa-solid fa-bug"></i>';
-                    icon.style.color = 'var(--error)';
-                    text.innerText = "HOST_OFFLINE";
-                    text.style.color = 'var(--error)';
-                    details.innerText = `ERR: ${extra}`;
-                }
-                
-                gsap.from(resArea, { y: 20, opacity: 0, duration: 0.5 });
-            }, 600);
+            gsap.from(icon, {scale: 0.5, opacity: 0, duration: 0.5, ease: "back.out"});
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // BG Canvas
+        const canvas = document.getElementById('pixel-canvas');
+        const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize; resize();
+
+        function draw() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#00ff41";
+            for(let i=0; i<25; i++) {
+                ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+            }
+            requestAnimationFrame(draw);
+        }
+        draw();
     </script>
 </body>
 </html>
