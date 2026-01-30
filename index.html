@@ -34,35 +34,45 @@
         }
 
         #pixel-canvas {
-            position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.3;
+            position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.4;
         }
 
+        /* ТОТ САМЫЙ ДИЗАЙН КАРТОЧКИ */
         .main-card {
             position: relative;
             z-index: 10;
-            width: 92%;
-            max-width: 400px;
+            width: 90%;
+            max-width: 420px;
             background: rgba(10, 10, 10, 0.98);
             border: 1px solid var(--primary);
-            padding: 20px;
+            padding: 25px;
+            border-radius: 4px;
             text-align: center;
-            box-shadow: 0 0 20px rgba(0, 255, 65, 0.1);
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.1);
         }
 
-        h1 { font-size: 0.8rem; letter-spacing: 3px; margin-bottom: 15px; color: var(--primary); }
+        h1 { font-size: 0.9rem; letter-spacing: 3px; margin-bottom: 20px; color: var(--primary); }
+
+        .input-group { position: relative; margin-bottom: 15px; }
 
         input {
             width: 100%; background: #000; border: 1px solid #1a3a1a;
-            padding: 12px; margin-bottom: 10px;
+            padding: 12px 45px 12px 12px; border-radius: 0;
             color: var(--primary); font-size: 14px; outline: none;
-            font-family: inherit;
+            font-family: inherit; transition: border 0.3s;
+        }
+        input:focus { border-color: var(--primary); }
+
+        .paste-btn {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: var(--primary); cursor: pointer; opacity: 0.7;
         }
 
         .check-btn {
             width: 100%; padding: 15px; background: var(--primary);
             color: black; border: none; font-weight: 900;
-            cursor: pointer; position: relative; overflow: hidden;
-            text-transform: uppercase;
+            cursor: pointer; letter-spacing: 1px; position: relative;
+            overflow: hidden; text-transform: uppercase;
         }
         
         .check-btn.abort { background: var(--error); color: white; }
@@ -73,48 +83,47 @@
         }
 
         #log-container {
-            height: 150px; overflow-y: auto;
+            height: 180px; overflow-y: auto;
             background: #000; margin-top: 15px;
-            text-align: left; border: 1px solid #1a3a1a; padding: 10px;
+            text-align: left; border: 1px solid #1a3a1a;
+            padding: 10px;
         }
 
-        .log-line { font-size: 10px; color: var(--primary); margin-bottom: 4px; opacity: 0.7; }
-
-        /* Фиксированная область результата, чтобы ничего не прыгало */
-        .result-wrapper {
-            height: 70px;
-            margin-top: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+        .log-line {
+            font-size: 10px; color: var(--primary); margin-bottom: 4px;
+            opacity: 0.8; white-space: pre-wrap;
         }
 
-        #result-area { display: none; }
-        .status-icon { font-size: 30px; margin-bottom: 5px; }
+        #result-area { margin-top: 20px; display: none; height: 70px; }
+        .status-icon { font-size: 36px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
     <canvas id="pixel-canvas"></canvas>
 
-    <div class="main-card">
+    <div class="main-card" id="card">
         <h1>BLAME MY INTERNET</h1>
         
-        <input type="text" id="url-input" placeholder="HOST_ADDRESS" spellcheck="false">
+        <div class="input-group">
+            <input type="text" id="url-input" placeholder="HOST_ADDRESS" spellcheck="false">
+            <button class="paste-btn" onclick="pasteFromClipboard()">
+                <i class="fa-solid fa-paste"></i>
+            </button>
+        </div>
 
         <button class="check-btn" id="btn-main" onclick="handleAction()">
             EXECUTE SCAN
         </button>
 
-        <div id="log-container"></div>
+        <div id="log-container">
+            <div class="log-line">> SYSTEM_IDLE...</div>
+        </div>
         
-        <div class="result-wrapper">
-            <div id="result-area">
-                <div id="icon-success" class="status-icon" style="color:var(--primary)"><i class="fa-solid fa-shield-halved"></i></div>
-                <div id="icon-fail" class="status-icon" style="color:var(--error)"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                <div id="status-text" style="font-size: 11px; font-weight: bold;"></div>
-            </div>
+        <div id="result-area">
+            <div id="icon-success" class="status-icon" style="color:var(--primary)"><i class="fa-solid fa-shield-halved"></i></div>
+            <div id="icon-fail" class="status-icon" style="color:var(--error)"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div id="status-text" style="font-size: 12px; font-weight: bold;"></div>
         </div>
     </div>
 
@@ -122,11 +131,12 @@
         const logContainer = document.getElementById('log-container');
         const urlInput = document.getElementById('url-input');
         const btnMain = document.getElementById('btn-main');
+        const resultArea = document.getElementById('result-area');
         
         let isRunning = false;
         let controller = null;
-        let pixelTimer = null;
-        let fakeLogTimer = null;
+        let pixelInterval = null;
+        let fakeLogInterval = null;
 
         function addLog(text, color = 'var(--primary)') {
             const line = document.createElement('div');
@@ -139,82 +149,80 @@
 
         function handleAction() {
             if (isRunning) {
-                stopAll("USER_ABORTED");
+                stopEverything("TERMINATED_BY_USER");
             } else {
                 startSequence();
             }
         }
 
-        function stopAll(reason = null) {
+        function stopEverything(msg) {
             isRunning = false;
             if (controller) controller.abort();
             
-            // Чистим все таймеры
-            clearInterval(pixelTimer);
-            clearInterval(fakeLogTimer);
+            clearInterval(pixelInterval);
+            clearInterval(fakeLogInterval);
             
             btnMain.innerText = "EXECUTE SCAN";
             btnMain.classList.remove('abort');
             
-            if (reason) addLog(reason, 'var(--error)');
+            // Чистим старые анимации GSAP, чтобы карточка не улетала
+            gsap.killTweensOf("#result-area");
+            
+            if (msg) addLog(msg, 'var(--error)');
         }
 
         async function startSequence() {
             const target = urlInput.value.trim();
-            if (!target) return;
-
-            // Сброс UI перед стартом
-            stopAll(); 
+            if(!target) return;
+            
+            stopEverything(); 
             isRunning = true;
+            
             btnMain.innerText = "ABORT_SEQUENCE";
             btnMain.classList.add('abort');
             logContainer.innerHTML = '';
-            document.getElementById('result-area').style.display = 'none';
+            resultArea.style.display = 'none';
 
-            // Эффект пикселей
-            pixelTimer = setInterval(() => {
-                const p = document.createElement('div');
-                p.className = 'btn-pixel';
-                p.style.width = (Math.random() * 30 + 10) + 'px';
-                p.style.left = Math.random() * (btnMain.offsetWidth - 20) + 'px';
-                p.style.top = Math.random() * (btnMain.offsetHeight - 3) + 'px';
-                btnMain.appendChild(p);
-                setTimeout(() => p.remove(), 150);
-            }, 60);
+            // Пиксели кнопки
+            pixelInterval = setInterval(() => {
+                const pixel = document.createElement('div');
+                pixel.className = 'btn-pixel';
+                const w = Math.random() * 40 + 10;
+                pixel.style.width = w + 'px';
+                pixel.style.left = Math.random() * (btnMain.offsetWidth - w) + 'px';
+                pixel.style.top = Math.random() * (btnMain.offsetHeight - 3) + 'px';
+                btnMain.appendChild(pixel);
+                setTimeout(() => pixel.remove(), 150);
+            }, 50);
 
-            addLog("INITIATING SCAN...");
+            addLog("INITIALIZING CONNECT...");
             controller = new AbortController();
 
-            // Фейковые логи
-            const steps = ["RESOLVING_DNS...", "BYPASSING_WAF...", "PROBING_NODES...", "HANDSHAKE..."];
-            let stepIdx = 0;
-            fakeLogTimer = setInterval(() => {
-                if(stepIdx < steps.length) addLog(steps[stepIdx++]);
-            }, 600);
+            // Фейковые логи в процессе
+            const fakeSteps = ["RESOLVING_DNS...", "STRETCHING_PACKETS...", "BYPASSING_WAF...", "PROBING_NODES..."];
+            let sIdx = 0;
+            fakeLogInterval = setInterval(() => {
+                if(sIdx < fakeSteps.length) addLog(fakeSteps[sIdx++]);
+            }, 700);
 
-            // Запускаем реальный запрос + 3 сек ожидания
-            const checkPromise = checkSite(target);
-            const delayPromise = new Promise(r => setTimeout(r, 3000));
+            const checkTask = checkHost(target);
+            const minTime = new Promise(r => setTimeout(r, 3000));
 
             try {
-                const [result] = await Promise.all([checkPromise, delayPromise]);
-                if (isRunning) finish(result.ok, result.latency);
-            } catch (e) {
+                const [res] = await Promise.all([checkTask, minTime]);
+                if (isRunning) finish(res.ok, res.latency);
+            } catch(e) {
                 if (isRunning) finish(false, 0);
             }
         }
 
-        async function checkSite(target) {
+        async function checkHost(target) {
             let cleanUrl = target.startsWith('http') ? target : 'https://' + target;
             const start = Date.now();
             try {
-                // Добавляем небольшой таймаут самому запросу
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
                 const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(cleanUrl)}`;
-                const res = await fetch(proxyUrl, { signal: controller.signal });
-                const data = await res.json();
-                clearTimeout(timeoutId);
-
+                const response = await fetch(proxyUrl, { signal: controller.signal });
+                const data = await response.json();
                 return { ok: !!(data.status && data.status.http_code), latency: Date.now() - start };
             } catch {
                 return { ok: false, latency: 0 };
@@ -222,30 +230,38 @@
         }
 
         function finish(isOk, latency) {
-            stopAll();
-            const area = document.getElementById('result-area');
-            area.style.display = 'block';
+            stopEverything();
+            
+            resultArea.style.display = 'block';
             document.getElementById('icon-success').style.display = isOk ? 'block' : 'none';
             document.getElementById('icon-fail').style.display = isOk ? 'none' : 'block';
             
-            const txt = document.getElementById('status-text');
-            txt.innerText = isOk ? `ONLINE (${latency}ms)` : "OFFLINE / DENIED";
-            txt.style.color = isOk ? "var(--primary)" : "var(--error)";
+            const stText = document.getElementById('status-text');
+            stText.innerText = isOk ? `AVAILABLE (${latency}ms)` : "NOT AVAILABLE";
+            stText.style.color = isOk ? "var(--primary)" : "var(--error)";
+
+            if(!isOk) addLog("ERR: HOST_UNREACHABLE", 'var(--error)');
             
-            if (!isOk) addLog("SIGNAL_LOST", "var(--error)");
-            gsap.from(area, { y: 10, opacity: 0, duration: 0.3 });
+            // Анимация без накопления сдвигов
+            gsap.fromTo(resultArea, {opacity: 0, y: 10}, {opacity: 1, y: 0, duration: 0.3});
         }
 
-        // Фоновая анимация
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                urlInput.value = text;
+            } catch(e) {}
+        }
+
         const canvas = document.getElementById('pixel-canvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize; resize();
         function draw() {
-            ctx.fillStyle = "rgba(0,0,0,0.2)";
-            ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#00ff41";
-            for(let i=0; i<15; i++) ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+            for(let i=0; i<20; i++) ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
             requestAnimationFrame(draw);
         }
         draw();
