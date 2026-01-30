@@ -80,7 +80,6 @@
 
         .log-line { font-size: 10px; color: var(--primary); margin-bottom: 4px; opacity: 0.7; }
 
-        /* Фиксированная область результата, чтобы ничего не прыгало */
         .result-wrapper {
             height: 70px;
             margin-top: 15px;
@@ -126,7 +125,6 @@
         let isRunning = false;
         let controller = null;
         let pixelTimer = null;
-        let fakeLogTimer = null;
 
         function addLog(text, color = 'var(--primary)') {
             const line = document.createElement('div');
@@ -138,32 +136,24 @@
         }
 
         function handleAction() {
-            if (isRunning) {
-                stopAll("USER_ABORTED");
-            } else {
-                startSequence();
-            }
+            if (isRunning) stopAll("USER_ABORTED");
+            else startSequence();
         }
 
         function stopAll(reason = null) {
             isRunning = false;
             if (controller) controller.abort();
-            
-            // Чистим все таймеры
             clearInterval(pixelTimer);
-            clearInterval(fakeLogTimer);
-            
             btnMain.innerText = "EXECUTE SCAN";
             btnMain.classList.remove('abort');
-            
             if (reason) addLog(reason, 'var(--error)');
         }
 
         async function startSequence() {
-            const target = urlInput.value.trim();
+            let target = urlInput.value.trim();
             if (!target) return;
+            if (!target.startsWith('http')) target = 'https://' + target;
 
-            // Сброс UI перед стартом
             stopAll(); 
             isRunning = true;
             btnMain.innerText = "ABORT_SEQUENCE";
@@ -171,7 +161,6 @@
             logContainer.innerHTML = '';
             document.getElementById('result-area').style.display = 'none';
 
-            // Эффект пикселей
             pixelTimer = setInterval(() => {
                 const p = document.createElement('div');
                 p.className = 'btn-pixel';
@@ -182,42 +171,42 @@
                 setTimeout(() => p.remove(), 150);
             }, 60);
 
-            addLog("INITIATING SCAN...");
+            addLog("RACING PROXIES...");
             controller = new AbortController();
 
-            // Фейковые логи
-            const steps = ["RESOLVING_DNS...", "BYPASSING_WAF...", "PROBING_NODES...", "HANDSHAKE..."];
-            let stepIdx = 0;
-            fakeLogTimer = setInterval(() => {
-                if(stepIdx < steps.length) addLog(steps[stepIdx++]);
-            }, 600);
+            const startTime = Date.now();
+            
+            // Список прокси для гонки
+            const proxies = [
+                `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`,
+                `https://hex-cors-proxy.herokuapp.com/${target}`, // Запасной (может спать)
+                `https://corsproxy.io/?${encodeURIComponent(target)}`
+            ];
 
-            // Запускаем реальный запрос + 3 сек ожидания
-            const checkPromise = checkSite(target);
-            const delayPromise = new Promise(r => setTimeout(r, 3000));
+            // Функция для одного запроса
+            const fetchFromProxy = async (url, name) => {
+                const res = await fetch(url, { signal: controller.signal });
+                if (!res.ok) throw new Error();
+                addLog(`${name} RESPONDED`);
+                return Date.now() - startTime;
+            };
+
+            // Таймаут 3 секунды
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error("TIMEOUT")), 3000)
+            );
 
             try {
-                const [result] = await Promise.all([checkPromise, delayPromise]);
-                if (isRunning) finish(result.ok, result.latency);
+                // Кто первый встал, того и тапки
+                const fastestLatency = await Promise.race([
+                    fetchFromProxy(proxies[0], "NODE_ALPHA"),
+                    fetchFromProxy(proxies[2], "NODE_GAMMA"),
+                    timeoutPromise
+                ]);
+
+                if (isRunning) finish(true, fastestLatency);
             } catch (e) {
                 if (isRunning) finish(false, 0);
-            }
-        }
-
-        async function checkSite(target) {
-            let cleanUrl = target.startsWith('http') ? target : 'https://' + target;
-            const start = Date.now();
-            try {
-                // Добавляем небольшой таймаут самому запросу
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(cleanUrl)}`;
-                const res = await fetch(proxyUrl, { signal: controller.signal });
-                const data = await res.json();
-                clearTimeout(timeoutId);
-
-                return { ok: !!(data.status && data.status.http_code), latency: Date.now() - start };
-            } catch {
-                return { ok: false, latency: 0 };
             }
         }
 
@@ -236,16 +225,22 @@
             gsap.from(area, { y: 10, opacity: 0, duration: 0.3 });
         }
 
-        // Фоновая анимация
+        // Фон с крупными пикселями
         const canvas = document.getElementById('pixel-canvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize; resize();
+
         function draw() {
-            ctx.fillStyle = "rgba(0,0,0,0.2)";
-            ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = "rgba(0,0,0,0.15)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#00ff41";
-            for(let i=0; i<15; i++) ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+            
+            // Рисуем меньше точек, но делаем их крупнее (размер 4x4 вместо 2x2)
+            for(let i = 0; i < 8; i++) {
+                const size = 4; 
+                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, size, size);
+            }
             requestAnimationFrame(draw);
         }
         draw();
