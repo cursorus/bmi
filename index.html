@@ -6,8 +6,9 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon.jpg">
-    <link rel="icon" href="icon.jpg">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="manifest" href="manifest.json">
 
     <title>Blame My Internet</title>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
@@ -17,7 +18,8 @@
     <style>
         :root {
             --bg: #050505;
-            --primary: #00ff41;
+            --primary: #00FF00; /* Новый зеленый */
+            --console-green: #00ff41; /* Старый для консоли */
             --error: #ff3131;
         }
 
@@ -46,10 +48,28 @@
             border: 1px solid var(--primary);
             padding: 20px;
             text-align: center;
-            box-shadow: 0 0 20px rgba(0, 255, 65, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
         }
 
-        h1 { font-size: 0.8rem; letter-spacing: 3px; margin-bottom: 15px; color: var(--primary); }
+        /* Логотип с фоллбэком на текст */
+        .logo-container {
+            height: 40px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .logo-img {
+            max-height: 100%;
+            max-width: 100%;
+            display: block;
+        }
+        .logo-fallback {
+            font-size: 0.8rem;
+            letter-spacing: 3px;
+            color: var(--primary);
+            font-weight: bold;
+        }
 
         input {
             width: 100%; background: #000; border: 1px solid #1a3a1a;
@@ -78,7 +98,7 @@
             text-align: left; border: 1px solid #1a3a1a; padding: 10px;
         }
 
-        .log-line { font-size: 10px; color: var(--primary); margin-bottom: 4px; opacity: 0.7; }
+        .log-line { font-size: 10px; color: var(--console-green); margin-bottom: 4px; opacity: 0.7; }
 
         .result-wrapper {
             height: 70px;
@@ -98,7 +118,10 @@
     <canvas id="pixel-canvas"></canvas>
 
     <div class="main-card">
-        <h1>BLAME MY INTERNET</h1>
+        <div class="logo-container">
+            <img src="logo.png" alt="BLAME MY INTERNET" class="logo-img" onerror="this.style.display='none'; document.getElementById('alt-logo').style.display='block';">
+            <div id="alt-logo" class="logo-fallback" style="display:none;">BLAME MY INTERNET</div>
+        </div>
         
         <input type="text" id="url-input" placeholder="HOST_ADDRESS" spellcheck="false">
 
@@ -118,6 +141,13 @@
     </div>
 
     <script>
+        // Регистрация Service Worker для оффлайн работы
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log('SW failed', err));
+            });
+        }
+
         const logContainer = document.getElementById('log-container');
         const urlInput = document.getElementById('url-input');
         const btnMain = document.getElementById('btn-main');
@@ -126,7 +156,7 @@
         let controller = null;
         let pixelTimer = null;
 
-        function addLog(text, color = 'var(--primary)') {
+        function addLog(text, color = 'var(--console-green)') {
             const line = document.createElement('div');
             line.className = 'log-line';
             line.style.color = color;
@@ -152,6 +182,14 @@
         async function startSequence() {
             let target = urlInput.value.trim();
             if (!target) return;
+
+            // Проверка наличия интернета перед стартом
+            if (!navigator.onLine) {
+                addLog("CRITICAL: NO_LOCAL_INTERNET", "var(--error)");
+                finish(false, 0);
+                return;
+            }
+
             if (!target.startsWith('http')) target = 'https://' + target;
 
             stopAll(); 
@@ -173,17 +211,13 @@
 
             addLog("RACING PROXIES...");
             controller = new AbortController();
-
             const startTime = Date.now();
             
-            // Список прокси для гонки
             const proxies = [
                 `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`,
-                `https://hex-cors-proxy.herokuapp.com/${target}`, // Запасной (может спать)
                 `https://corsproxy.io/?${encodeURIComponent(target)}`
             ];
 
-            // Функция для одного запроса
             const fetchFromProxy = async (url, name) => {
                 const res = await fetch(url, { signal: controller.signal });
                 if (!res.ok) throw new Error();
@@ -191,19 +225,16 @@
                 return Date.now() - startTime;
             };
 
-            // Таймаут 3 секунды
             const timeoutPromise = new Promise((_, reject) => 
                 setTimeout(() => reject(new Error("TIMEOUT")), 3000)
             );
 
             try {
-                // Кто первый встал, того и тапки
                 const fastestLatency = await Promise.race([
                     fetchFromProxy(proxies[0], "NODE_ALPHA"),
-                    fetchFromProxy(proxies[2], "NODE_GAMMA"),
+                    fetchFromProxy(proxies[1], "NODE_GAMMA"),
                     timeoutPromise
                 ]);
-
                 if (isRunning) finish(true, fastestLatency);
             } catch (e) {
                 if (isRunning) finish(false, 0);
@@ -225,7 +256,6 @@
             gsap.from(area, { y: 10, opacity: 0, duration: 0.3 });
         }
 
-        // Фон с крупными пикселями
         const canvas = document.getElementById('pixel-canvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -234,12 +264,9 @@
         function draw() {
             ctx.fillStyle = "rgba(0,0,0,0.15)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#00ff41";
-            
-            // Рисуем меньше точек, но делаем их крупнее (размер 4x4 вместо 2x2)
+            ctx.fillStyle = "#00FF00"; // Крупные пиксели теперь яркие
             for(let i = 0; i < 8; i++) {
-                const size = 4; 
-                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, size, size);
+                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 4, 4);
             }
             requestAnimationFrame(draw);
         }
