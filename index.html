@@ -157,15 +157,14 @@ let isRunning = false;
 let controller = null;
 let pixelTimer = null;
 
-// Список доступных CORS прокси
 const PROXY_LIST = [
-    { name: "ALPHA", url: "https://api.allorigins.win/get?url=" },
-    { name: "BETA",  url: "https://corsproxy.io/?" },
-    { name: "GAMMA", url: "https://thingproxy.freeboard.io/fetch/" },
-    { name: "DELTA", url: "https://api.codetabs.com/v1/proxy/?quest=" },
-    { name: "EPSILON", url: "https://cors-anywhere.herokuapp.com/" }, // Требует активации, может упасть
-    { name: "ZETA",   url: "https://proxy.cors.sh/" },
-    { name: "OMEGA",  url: "https://wt-753982425578-0.sandbox.auth0-extend.com/proxy?url=" }
+  { id: 0, url: "https://api.allorigins.win/get?url=" },
+  { id: 1, url: "https://corsproxy.io/?" },
+  { id: 2, url: "https://thingproxy.freeboard.io/fetch/" },
+  { id: 3, url: "https://api.codetabs.com/v1/proxy/?quest=" },
+  { id: 4, url: "https://proxy.cors.sh/" },
+  { id: 5, url: "https://cors.isomorphic-git.org/" },
+  { id: 6, url: "https://yacdn.org/proxy/" }
 ];
 
 function addLog(text, color = 'var(--console-green)') {
@@ -210,7 +209,6 @@ async function startSequence() {
     logContainer.innerHTML = '';
     document.getElementById('result-area').style.display = 'none';
 
-    // Эффект пикселей на кнопке
     pixelTimer = setInterval(() => {
         const p = document.createElement('div');
         p.className = 'btn-pixel';
@@ -225,13 +223,13 @@ async function startSequence() {
     controller = new AbortController();
     const startTime = Date.now();
 
-    // Создаем массив запросов
+
     const fetchPromises = PROXY_LIST.map(proxy => {
         return new Promise(async (resolve, reject) => {
             const timeoutId = setTimeout(() => {
                 addLog(`NODE_${proxy.name}: TIMEOUT`, "orange");
                 reject("TIMEOUT");
-            }, 5000); // 5 секунд на каждый прокси
+            }, 5000); // 5 секунд на время ответа
 
             try {
                 const res = await fetch(proxy.url + encodeURIComponent(target), { 
