@@ -279,7 +279,7 @@ function finish(isOk, latency) {
     document.getElementById('icon-fail').style.display = isOk ? 'none' : 'block';
     
     const txt = document.getElementById('status-text');
-    txt.innerText = isOk ? `ONLINE (${latency}ms)` : "TARGET_UNREACHABLE";
+    txt.innerText = isOk ? `The site is reachable by us (${latency}ms)` : "The site is down for everyone. It is not just you";
     txt.style.color = isOk ? "var(--primary)" : "var(--error)";
     
     stopAll(isOk ? "SCAN_COMPLETE" : "SIGNAL_LOST");
